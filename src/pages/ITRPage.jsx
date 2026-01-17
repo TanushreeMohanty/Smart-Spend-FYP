@@ -1,491 +1,509 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { 
-  ChevronLeft, Info, CheckCircle2, AlertCircle, FileText, 
-  Wallet, ShieldCheck, Scale, Send, ArrowRight, Download, 
-  AlertOctagon, BadgeCheck 
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Wallet,
+  ShieldCheck,
+  Scale,
+  FileText,
+  Send,
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle2,
+  Info,
+  AlertCircle,
+  TrendingUp,
+} from "lucide-react";
 
-// Services & Config
-import { db, TABS } from '../config/constants';
-import { LocalRepository } from '../services/localRepository';
-import { TaxForensics } from '../services/taxForensics'; // Ensure you created this service!
-import { formatIndianCompact } from '../utils/helpers';
-
-// --- UTILITIES ---
-const formatCurrency = (amount) => 
-  new Intl.NumberFormat("en-IN", { 
-    style: "currency", 
-    currency: "INR", 
-    maximumFractionDigits: 0 
-  }).format(amount);
-
-const calculateOldRegimeTax = (taxableIncome) => {
-  if (taxableIncome <= 250000) return 0;
-  if (taxableIncome <= 500000) return (taxableIncome - 250000) * 0.05;
-  if (taxableIncome <= 1000000) return 12500 + (taxableIncome - 500000) * 0.2;
-  return 12500 + 100000 + (taxableIncome - 1000000) * 0.3;
+// --- TOOLTIP DATA & COMPONENT ---
+const HELP_TEXTS = {
+  salary: "Sum of Basic, HRA, and Special Allowance from Form 16.",
+  houseProperty: "Income from self-occupied or let-out property.",
+  businessIncome: "Profits/Gains from your profession or business.",
+  capitalGains: "Profit from sale of stocks, property, or mutual funds.",
+  otherIncome: "Freelance income, gifts, or lottery winnings.",
+  interestIncome: "Interest earned from Savings Bank and Fixed Deposits.",
+  section80C: "Investments in PPF, ELSS, LIC, or Tuition fees.",
+  section80D: "Health insurance premiums for self and family.",
+  section80E: "Interest paid on higher education loans.",
+  section80G: "Donations made to charitable organizations.",
+  hra: "Actual rent paid to your landlord.",
+  homeLoanInterest: "Interest component of your home loan EMI.",
+  nps80CCD: "Additional contributions to National Pension System.",
+  panNumber: "10-digit Alphanumeric Permanent Account Number.",
+  aadharNumber: "12-digit Unique Identification Number.",
+  bankAccount: "Account number for receiving tax refunds.",
+  ifscCode: "11-digit bank branch identification code.",
+  email: "Active email for communication with Income Tax Dept.",
+  mobile: "Mobile number linked to your Aadhar/PAN.",
 };
 
-const calculateNewRegimeTax = (taxableIncome) => {
-  // FY 2024-25 (AY 2025-26)
-  if (taxableIncome <= 300000) return 0;
-  if (taxableIncome <= 700000) return (taxableIncome - 300000) * 0.05;
-  if (taxableIncome <= 1000000) return 20000 + (taxableIncome - 700000) * 0.1;
-  if (taxableIncome <= 1200000) return 50000 + (taxableIncome - 1000000) * 0.15;
-  if (taxableIncome <= 1500000) return 80000 + (taxableIncome - 1200000) * 0.2;
-  return 140000 + (taxableIncome - 1500000) * 0.3;
-};
-
-// --- SUB-COMPONENT: AUDIT SHIELD (The Forensic UI) ---
-const AuditShield = ({ auditData }) => {
-    const isClean = auditData.score > 80;
-    
-    return (
-        <div className={`p-5 rounded-2xl border mb-6 transition-all ${isClean ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30'}`}>
-            <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${isClean ? 'bg-emerald-500/20' : 'bg-rose-500/20'}`}>
-                        {isClean ? <BadgeCheck className="w-6 h-6 text-emerald-400" /> : <ShieldCheck className="w-6 h-6 text-rose-400" />}
-                    </div>
-                    <div>
-                        <h4 className={`text-sm font-bold ${isClean ? 'text-emerald-100' : 'text-rose-100'}`}>
-                            {isClean ? 'Audit Ready' : 'Audit Risks Detected'}
-                        </h4>
-                        <p className="text-[10px] text-slate-400">Integrity Score</p>
-                    </div>
-                </div>
-                <span className={`text-2xl font-black ${isClean ? 'text-emerald-400' : 'text-rose-400'}`}>{Math.round(auditData.score)}<span className="text-sm opacity-50">/100</span></span>
-            </div>
-            
-            <div className="space-y-3 bg-black/20 p-3 rounded-xl">
-                {auditData.incomeGap > 50000 && (
-                    <div className="flex gap-2 text-[11px] text-rose-200 items-start">
-                        <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
-                        <span>Declared income exceeds bank credits by <strong>{formatIndianCompact(auditData.incomeGap)}</strong>. Ensure cash income is accounted for.</span>
-                    </div>
-                )}
-                {auditData.proofGap > 20000 && (
-                    <div className="flex gap-2 text-[11px] text-amber-200 items-start">
-                        <AlertOctagon className="w-3 h-3 mt-0.5 shrink-0" />
-                        <span>Section 80C claims exceed visible bank outflows by <strong>{formatIndianCompact(auditData.proofGap)}</strong>.</span>
-                    </div>
-                )}
-                {auditData.anomalies.map((flag, i) => (
-                    <div key={i} className="flex gap-2 text-[11px] text-amber-200 items-start">
-                        <AlertOctagon className="w-3 h-3 mt-0.5 shrink-0" />
-                        <span>{flag.msg}</span>
-                    </div>
-                ))}
-                {isClean && auditData.anomalies.length === 0 && (
-                    <p className="text-[11px] text-emerald-200/70 ml-1 flex items-center gap-2">
-                        <CheckCircle2 className="w-3 h-3" /> Your bank statement fully supports this declaration.
-                    </p>
-                )}
-            </div>
-        </div>
-    );
-};
-
-// --- SUB-COMPONENT: INPUT FIELD ---
-const InputField = ({ label, value, onChange, placeholder = "0", maxLimit, icon }) => (
-  <div className="space-y-2">
-    <div className="flex justify-between items-center px-1">
-        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-            {label}
-        </label>
-        {maxLimit && (
-            <span className="text-[10px] text-slate-500 font-mono">
-                Max: {formatIndianCompact(maxLimit)}
-            </span>
-        )}
-    </div>
-    <div className="relative group">
-      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-        <span className="text-slate-500 font-serif text-lg">₹</span>
-      </div>
-      <input
-        type="number"
-        value={value || ""}
-        onChange={(e) => {
-          let val = parseFloat(e.target.value) || 0;
-          if (maxLimit && val > maxLimit) val = maxLimit;
-          onChange(val);
-        }}
-        placeholder={placeholder}
-        className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-4 pl-10 pr-10 text-white placeholder-slate-600 focus:border-blue-500/50 focus:bg-slate-800/80 focus:ring-1 focus:ring-blue-500/20 focus:outline-none transition-all font-mono shadow-inner"
-      />
-      {icon && (
-        <div className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-600 group-focus-within:text-blue-400 transition-colors">
-            {icon}
-        </div>
-      )}
+const InfoTooltip = ({ field }) => (
+  <div className="group relative inline-block ml-1.5 align-middle">
+    <Info className="w-3 h-3 text-slate-500 cursor-help hover:text-blue-400 transition-colors" />
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-800 text-[10px] text-slate-200 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl border border-white/10 z-50">
+      {HELP_TEXTS[field] || "Enter the amount as per your records."}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-800" />
     </div>
   </div>
 );
 
-// --- SUB-COMPONENT: STEPPER ICON ---
-const StepIcon = ({ step, current, icon: Icon, label }) => {
-    const isActive = current === step;
-    const isDone = current > step;
-    return (
-        <div className="flex flex-col items-center gap-3 relative z-10 group cursor-default">
-            <div 
-                className={`
-                    w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border
-                    ${isActive 
-                        ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)] scale-110' 
-                        : isDone 
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                            : 'bg-white/5 border-white/10 text-slate-600'
-                    }
-                `}
-            >
-                {isDone ? <CheckCircle2 className="w-6 h-6" /> : <Icon className="w-5 h-5" />}
-            </div>
-            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${isActive ? 'text-blue-400' : 'text-slate-600'}`}>
-                {label}
-            </span>
-        </div>
-    );
-};
-
-// --- MAIN PAGE COMPONENT ---
-export default function ITRPage({ user, transactions = [], setActiveTab, showToast }) {
-  // State
+export const ITRCalculator = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [taxRegime, setTaxRegime] = useState("new");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionSuccess, setSubmissionSuccess] = useState(false);
-  const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
 
-  const [income, setIncome] = useState({ salary: 0, interestIncome: 0, otherIncome: 0 });
-  const [deductions, setDeductions] = useState({ section80C: 0, section80D: 0, hra: 0, section80E: 0, section80G: 0 });
-  
-  // 1. Auto-Fill from Bank Data
-  useEffect(() => {
-    if (transactions.length > 0 && income.salary === 0) {
-        const salary = transactions.filter(t => t.category === 'salary' && t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-        const interest = transactions.filter(t => t.description.toLowerCase().includes('interest') && t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-        
-        if (salary > 0) {
-            setIncome(prev => ({ ...prev, salary, interestIncome: interest }));
-            showToast("Income auto-detected from statement", "success");
-        }
-    }
-  }, [transactions]);
+  // Income State - UNTOUCHED
+  const [income, setIncome] = useState({
+    salary: "",
+    houseProperty: "",
+    businessIncome: "",
+    capitalGains: "",
+    otherIncome: "",
+    interestIncome: "",
+  });
 
-  // 2. Load Draft
-  useEffect(() => {
-      const load = async () => {
-          const draft = await LocalRepository.getITRDraft(user?.uid);
-          if (draft) {
-              setIncome(draft.income);
-              setDeductions(draft.deductions);
-          }
-      };
-      if (user) load();
-  }, [user]);
+  // Deductions State - UNTOUCHED
+  const [deductions, setDeductions] = useState({
+    section80C: "",
+    section80D: "",
+    section80E: "",
+    section80G: "",
+    hra: "",
+    homeLoanInterest: "",
+    nps80CCD: "",
+  });
 
-  // 3. Auto-Save Debounce
-  useEffect(() => {
-      const timer = setTimeout(async () => {
-          if (user && !submissionSuccess) {
-              setAutoSaveStatus("saving");
-              await LocalRepository.saveITRDraft(user.uid, { income, deductions });
-              setTimeout(() => setAutoSaveStatus("saved"), 800);
-          }
-      }, 1500);
-      return () => clearTimeout(timer);
-  }, [income, deductions, user, submissionSuccess]);
+  // Filing Details State - UNTOUCHED
+  const [filingDetails, setFilingDetails] = useState({
+    panNumber: "",
+    aadharNumber: "",
+    bankAccount: "",
+    ifscCode: "",
+    email: "",
+    mobile: "",
+  });
 
-  // 4. ADVANCED FORENSIC TAX LOGIC (The "Smart Audit")
-  const auditResult = useMemo(() => {
-    const grossIncome = Object.values(income).reduce((a, b) => a + b, 0);
-    const stdDed = 75000; // FY 24-25 Standard Deduction
-
-    // A. Estimate Basic Components
-    // Heuristic: Basic Salary is typically ~40% of Gross CTC
-    const basicSalary = grossIncome * 0.40; 
-    const hraReceived = grossIncome * 0.20; 
-
-    // B. Calculate Accurate HRA (Rule based)
-    const hraExemption = TaxForensics.calculateHRAExemption(
-        basicSalary, 
-        hraReceived, 
-        parseFloat(deductions.hra || 0) // Input treated as Rent Paid
+  // Logic Functions - UNTOUCHED
+  const calculateTotalIncome = () => {
+    return Object.values(income).reduce(
+      (sum, val) => sum + (parseFloat(val) || 0),
+      0
     );
-
-    // C. Forensic Audit Checks
-    const incomeAudit = TaxForensics.auditIncome(transactions, { monthlyIncome: grossIncome / 12 });
-    const investAudit = TaxForensics.verifyInvestments(transactions, { ...deductions, grossSalary: grossIncome });
-    const anomalies = TaxForensics.detectAnomalies(transactions);
-
-    // D. Calculate Taxable Income
-    const totalDeductionsOld = 
-        Math.min(deductions.section80C, 150000) + 
-        Math.min(deductions.section80D, 75000) + 
-        hraExemption + // Uses calculated exemption, not raw rent paid
-        stdDed;
-
-    const taxableOld = Math.max(0, grossIncome - totalDeductionsOld);
-    const taxableNew = Math.max(0, grossIncome - stdDed);
-
-    const taxOld = calculateOldRegimeTax(taxableOld) * 1.04;
-    const taxNew = calculateNewRegimeTax(taxableNew) * 1.04;
-    
-    // Rebate 87A Logic
-    const finalTaxOld = taxableOld <= 500000 ? 0 : taxOld;
-    const finalTaxNew = taxableNew <= 700000 ? 0 : taxNew;
-
-    return { 
-        grossIncome, 
-        totalDeductions: taxRegime === 'old' ? totalDeductionsOld : stdDed,
-        taxableIncome: taxRegime === 'old' ? taxableOld : taxableNew,
-        tax: taxRegime === 'old' ? finalTaxOld : finalTaxNew,
-        audit: {
-            score: Math.min(incomeAudit.integrityScore, investAudit.isFraudulent ? 40 : 100),
-            incomeGap: incomeAudit.gap,
-            proofGap: investAudit.gap,
-            anomalies: anomalies.flags
-        }
-    };
-  }, [income, deductions, taxRegime, transactions]);
-
-  // Submit Handler
-  const handleFileITR = async () => {
-      setIsSubmitting(true);
-      try {
-          const itrData = {
-              userId: user.uid,
-              fy: '2024-25',
-              filedAt: serverTimestamp(),
-              income,
-              deductions,
-              finalTax: auditResult.tax,
-              regime: taxRegime,
-              status: 'filed',
-              auditScore: auditResult.audit.score // Saving the integrity score
-          };
-          await setDoc(doc(db, 'artifacts', user.uid, 'itr_returns', 'AY_2025_26'), itrData);
-          setSubmissionSuccess(true);
-          showToast("ITR Filed Successfully!", "success");
-      } catch (e) {
-          console.error(e);
-          showToast("Filing failed. Please check connection.", "error");
-      } finally {
-          setIsSubmitting(false);
-      }
   };
 
-  // --- RENDER SUCCESS VIEW ---
-  if (submissionSuccess) {
-      return (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in zoom-in-95 duration-500">
-              <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]">
-                  <CheckCircle2 className="w-12 h-12 text-emerald-400" />
-              </div>
-              <h2 className="text-3xl font-bold text-white mb-2">Filing Complete!</h2>
-              <p className="text-slate-400 text-sm mb-8">Your return for AY 2025-26 has been secured.</p>
-              
-              <div className="bg-white/5 border border-white/10 p-8 rounded-3xl w-full max-w-md backdrop-blur-xl relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-emerald-500"></div>
-                  <div className="flex justify-between items-center mb-6">
-                      <span className="text-xs text-slate-500 uppercase font-bold tracking-widest">Tax Liability</span>
-                      <span className="text-2xl font-bold text-white">{formatCurrency(auditResult.tax)}</span>
-                  </div>
-                  <div className="space-y-3">
-                      <div className="flex justify-between text-sm"><span className="text-slate-400">Gross Income</span><span className="text-slate-200">{formatCurrency(auditResult.grossIncome)}</span></div>
-                      <div className="flex justify-between text-sm"><span className="text-slate-400">Total Deductions</span><span className="text-emerald-400">-{formatCurrency(auditResult.totalDeductions)}</span></div>
-                      <div className="flex justify-between text-sm"><span className="text-slate-400">Regime</span><span className="text-slate-200 uppercase">{taxRegime}</span></div>
-                  </div>
-              </div>
+  const calculateTotalDeductions = () => {
+    if (taxRegime === "new") return 0;
+    const deductionLimits = {
+      section80C: 150000,
+      section80D: 75000,
+      section80E: Infinity,
+      section80G: Infinity,
+      hra: Infinity,
+      homeLoanInterest: 200000,
+      nps80CCD: 50000,
+    };
+    return Object.entries(deductions).reduce((sum, [key, val]) => {
+      const amount = parseFloat(val) || 0;
+      const limit = deductionLimits[key];
+      return sum + Math.min(amount, limit);
+    }, 0);
+  };
 
-              <div className="flex gap-4 mt-8">
-                  <button onClick={() => setActiveTab(TABS.HOME)} className="px-8 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-white text-sm font-bold transition-colors">
-                      Return Home
-                  </button>
-                  <button className="px-8 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white text-sm font-bold shadow-lg shadow-blue-500/20 transition-colors flex items-center gap-2">
-                      <Download className="w-4 h-4" /> Download Ack
-                  </button>
-              </div>
-          </div>
-      );
-  }
+  const calculateOldRegimeTax = (taxableIncome) => {
+    let tax = 0;
+    if (taxableIncome <= 250000) tax = 0;
+    else if (taxableIncome <= 500000) tax = (taxableIncome - 250000) * 0.05;
+    else if (taxableIncome <= 1000000)
+      tax = 12500 + (taxableIncome - 500000) * 0.2;
+    else tax = 112500 + (taxableIncome - 1000000) * 0.3;
+    if (taxableIncome <= 500000) tax = Math.max(0, tax - 12500);
+    return tax * 1.04;
+  };
 
-  // --- RENDER WIZARD ---
+  const calculateNewRegimeTax = (totalIncome) => {
+    let tax = 0;
+    if (totalIncome <= 300000) tax = 0;
+    else if (totalIncome <= 600000) tax = (totalIncome - 300000) * 0.05;
+    else if (totalIncome <= 900000) tax = 15000 + (totalIncome - 600000) * 0.1;
+    else if (totalIncome <= 1200000)
+      tax = 45000 + (totalIncome - 900000) * 0.15;
+    else if (totalIncome <= 1500000)
+      tax = 90000 + (totalIncome - 1200000) * 0.2;
+    else tax = 150000 + (totalIncome - 1500000) * 0.3;
+    if (totalIncome <= 700000) tax = Math.max(0, tax - 25000);
+    return tax * 1.04;
+  };
+
+  const getTaxResults = () => {
+    const totalIncome = calculateTotalIncome();
+    const totalDeductions = calculateTotalDeductions();
+    const taxableIncome = Math.max(0, totalIncome - totalDeductions);
+    const oldRegimeTax = calculateOldRegimeTax(taxableIncome);
+    const newRegimeTax = calculateNewRegimeTax(totalIncome);
+    return {
+      totalIncome,
+      totalDeductions,
+      taxableIncome,
+      oldRegimeTax,
+      newRegimeTax,
+      recommendedRegime: oldRegimeTax < newRegimeTax ? "old" : "new",
+      savingsWithRecommended: Math.abs(oldRegimeTax - newRegimeTax),
+    };
+  };
+
+  const handleInputChange = (category, field, value) => {
+    if (category === "income") setIncome({ ...income, [field]: value });
+    else if (category === "deductions")
+      setDeductions({ ...deductions, [field]: value });
+    else if (category === "filing")
+      setFilingDetails({ ...filingDetails, [field]: value });
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const steps = [
+    { id: 1, label: "Income", icon: <Wallet size={16} /> },
+    { id: 2, label: "Deductions", icon: <ShieldCheck size={16} /> },
+    { id: 3, label: "Regime", icon: <Scale size={16} /> },
+    { id: 4, label: "Summary", icon: <FileText size={16} /> },
+    { id: 5, label: "File", icon: <Send size={16} /> },
+  ];
+
   return (
-    <div className="animate-in slide-in-from-bottom-8 duration-500 pb-20">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-            <button onClick={() => setActiveTab(TABS.HOME)} className="p-2 hover:bg-white/5 rounded-full text-slate-400 hover:text-white transition-colors">
-                <ChevronLeft className="w-6 h-6" />
-            </button>
-            <div className="text-center">
-                <h2 className="text-xl font-bold text-white tracking-tight">ITR Assistant</h2>
-                <div className="flex items-center justify-center gap-2 mt-1">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">AY 2025-26</p>
-                    <div className="w-1 h-1 rounded-full bg-slate-700"></div>
-                    <p className={`text-[10px] font-bold uppercase tracking-wider ${autoSaveStatus === 'saving' ? 'text-blue-400' : 'text-emerald-500'}`}>
-                        {autoSaveStatus === 'saving' ? 'Saving...' : 'Cloud Synced'}
-                    </p>
+    <div className="min-h-screen bg-transparent text-slate-200 pb-20 overflow-x-hidden">
+      <div className="max-w-2xl mx-auto space-y-8 px-2">
+        {/* Modern Header Section */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between bg-white/5 p-6 rounded-[2.5rem] border border-white/10 backdrop-blur-xl shadow-2xl"
+        >
+          <div className="flex items-center gap-4">
+            <div className="bg-gradient-to-br from-blue-500 to-cyan-400 p-3 rounded-2xl shadow-lg shadow-blue-500/20">
+              <FileText className="text-slate-900 w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white tracking-tight">
+                ITR Wizard
+              </h1>
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em]">
+                AY 2025-26 • Secure
+              </p>
+            </div>
+          </div>
+          <div className="bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-tighter">
+              Live Audit
+            </span>
+          </div>
+        </motion.div>
+
+        {/* Liquid Stepper */}
+        <div className="flex justify-between items-center relative px-4">
+          <div className="absolute h-[2px] bg-white/5 left-8 right-8 top-5 -z-10" />
+          {steps.map((s) => (
+            <motion.div
+              key={s.id}
+              onClick={() => setCurrentStep(s.id)}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex flex-col items-center gap-2 cursor-pointer group"
+            >
+              <motion.div
+                animate={{
+                  scale: currentStep === s.id ? 1.2 : 1,
+                  backgroundColor:
+                    currentStep >= s.id ? "#2563eb" : "rgba(255,255,255,0.05)",
+                }}
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors shadow-xl ${
+                  currentStep >= s.id
+                    ? "text-white shadow-blue-900/40"
+                    : "text-slate-600 border border-white/5"
+                } group-hover:opacity-80`}
+              >
+                {currentStep > s.id ? <CheckCircle2 size={18} /> : s.icon}
+              </motion.div>
+              <span
+                className={`text-[9px] font-black uppercase tracking-widest transition-colors ${
+                  currentStep === s.id ? "text-blue-400" : "text-slate-600"
+                } group-hover:text-blue-300`}
+              >
+                {s.label}
+              </span>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Content Container */}
+        <div className="bg-white/5 border border-white/10 rounded-[3rem] p-8 backdrop-blur-2xl shadow-2xl relative overflow-hidden min-h-[450px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            >
+              {currentStep === 1 && (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp size={16} className="text-blue-400" />
+                    <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">
+                      Income Declaration
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {Object.keys(income).map((key) => (
+                      <div key={key} className="group transition-all">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2 ml-1 group-focus-within:text-blue-400 transition-colors">
+                          {key.replace(/([A-Z])/g, " $1")}{" "}
+                          <InfoTooltip field={key} />
+                        </p>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium italic">
+                            ₹
+                          </span>
+                          <input
+                            type="number"
+                            value={income[key]}
+                            onChange={(e) =>
+                              handleInputChange("income", key, e.target.value)
+                            }
+                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-white focus:border-blue-500/50 focus:bg-white/5 outline-none transition-all shadow-inner"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-            </div>
-            <div className="w-10" />
-        </div>
+              )}
 
-        {/* Stepper */}
-        <div className="relative flex justify-between px-6 mb-12">
-            <div className="absolute top-6 left-10 right-10 h-0.5 bg-gradient-to-r from-blue-500/20 via-white/10 to-blue-500/20 -z-0" />
-            <StepIcon step={1} current={currentStep} icon={Wallet} label="Income" />
-            <StepIcon step={2} current={currentStep} icon={ShieldCheck} label="Deductions" />
-            <StepIcon step={3} current={currentStep} icon={Scale} label="Regime" />
-            <StepIcon step={4} current={currentStep} icon={FileText} label="Review" />
-        </div>
+              {currentStep === 2 && (
+                <div className="space-y-6">
+                  <div className="bg-amber-500/10 border border-amber-500/20 p-5 rounded-3xl flex gap-4 items-start shadow-lg">
+                    <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-200/80 leading-relaxed font-medium">
+                      Note: These deductions are only valid for the Old Tax
+                      Regime.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {Object.keys(deductions).map((key) => (
+                      <div key={key} className="space-y-2">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1">
+                          {key.replace(/([A-Z])/g, " $1")}{" "}
+                          <InfoTooltip field={key} />
+                        </p>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                            ₹
+                          </span>
+                          <input
+                            type="number"
+                            value={deductions[key]}
+                            onChange={(e) =>
+                              handleInputChange(
+                                "deductions",
+                                key,
+                                e.target.value
+                              )
+                            }
+                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-white focus:border-blue-500/50 focus:bg-white/5 outline-none transition-all shadow-inner disabled:opacity-30"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-        {/* Dynamic Content Card */}
-        <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-6 md:p-8 relative overflow-hidden min-h-[450px] shadow-2xl backdrop-blur-xl">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[100px] pointer-events-none rounded-full"></div>
-            
-            <AnimatePresence mode="wait">
-                <motion.div 
-                    key={currentStep}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
-                >
-                    {/* STEP 1: INCOME */}
-                    {currentStep === 1 && (
-                        <div className="space-y-6">
-                            {income.salary > 0 && (
-                                <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-3 animate-in fade-in">
-                                    <div className="p-2 bg-emerald-500/20 rounded-full"><CheckCircle2 className="w-4 h-4 text-emerald-400" /></div>
-                                    <div>
-                                        <p className="text-xs font-bold text-emerald-200">Auto-Detected Salary</p>
-                                        <p className="text-[10px] text-emerald-500/70">Prefilled from your bank credits.</p>
-                                    </div>
-                                </div>
+              {currentStep === 3 && (
+                <div className="space-y-6">
+                  <div className="mb-6 text-center">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-2">
+                      Comparison Engine
+                    </p>
+                    <h2 className="text-xl font-bold text-white">
+                      Select Your Regime
+                    </h2>
+                  </div>
+                  <div className="space-y-4">
+                    {["new", "old"].map((r) => {
+                      const results = getTaxResults();
+                      const isSelected = taxRegime === r;
+                      const isRecommended = results.recommendedRegime === r;
+                      return (
+                        <motion.button
+                          whileTap={{ scale: 0.98 }}
+                          key={r}
+                          onClick={() => setTaxRegime(r)}
+                          className={`w-full p-6 rounded-[2rem] border-2 text-left transition-all relative overflow-hidden group ${
+                            isSelected
+                              ? "border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10"
+                              : "border-white/5 bg-white/5 hover:border-white/20"
+                          }`}
+                        >
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-black text-white uppercase text-[10px] tracking-[0.2em]">
+                              {r} Tax Regime
+                            </span>
+                            {isSelected && (
+                              <CheckCircle2
+                                className="text-blue-400"
+                                size={24}
+                              />
                             )}
-                            <InputField label="Gross Salary" value={income.salary} onChange={v => setIncome({...income, salary: v})} />
-                            <InputField label="Interest Income" value={income.interestIncome} onChange={v => setIncome({...income, interestIncome: v})} />
-                            <InputField label="Other Sources" value={income.otherIncome} onChange={v => setIncome({...income, otherIncome: v})} />
-                        </div>
-                    )}
-
-                    {/* STEP 2: DEDUCTIONS */}
-                    {currentStep === 2 && (
-                        <div className="space-y-6">
-                            <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl flex gap-3">
-                                <Info className="w-5 h-5 text-blue-400 shrink-0" />
-                                <p className="text-xs text-blue-200 leading-relaxed">Standard Deduction of <span className="font-bold text-white">₹75,000</span> is automatically applied to both regimes.</p>
+                          </div>
+                          <div className="text-3xl font-bold text-white tracking-tighter">
+                            {formatCurrency(
+                              r === "old"
+                                ? results.oldRegimeTax
+                                : results.newRegimeTax
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">
+                            Payable Tax Liability
+                          </p>
+                          {isRecommended && (
+                            <div className="absolute top-0 right-0 bg-emerald-500 text-slate-900 text-[8px] font-black px-4 py-1.5 rounded-bl-2xl uppercase tracking-[0.1em]">
+                              Recommended Saving
                             </div>
-                            <InputField label="80C (PPF/ELSS/LIC)" value={deductions.section80C} onChange={v => setDeductions({...deductions, section80C: v})} maxLimit={150000} />
-                            <InputField label="80D (Health Ins)" value={deductions.section80D} onChange={v => setDeductions({...deductions, section80D: v})} maxLimit={75000} />
-                            <InputField label="HRA Exemption (Rent Paid)" value={deductions.hra} onChange={v => setDeductions({...deductions, hra: v})} />
-                        </div>
-                    )}
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-                    {/* STEP 3: REGIME SELECTION */}
-                    {currentStep === 3 && (
-                        <div className="space-y-4 pt-2">
-                            {['new', 'old'].map(r => {
-                                const isNew = r === 'new';
-                                // Calculate tax preview for card
-                                // NOTE: We can't use auditResult here because it depends on taxRegime state.
-                                // We simulate the calculation for the specific card.
-                                const stdDed = 75000;
-                                let taxVal = 0;
-                                
-                                if (isNew) {
-                                    const tNew = Math.max(0, auditResult.grossIncome - stdDed);
-                                    taxVal = (tNew <= 700000 ? 0 : calculateNewRegimeTax(tNew)) * 1.04;
-                                } else {
-                                    const hEx = TaxForensics.calculateHRAExemption(auditResult.grossIncome * 0.40, auditResult.grossIncome * 0.20, parseFloat(deductions.hra||0));
-                                    const tOld = Math.max(0, auditResult.grossIncome - (Math.min(deductions.section80C, 150000) + Math.min(deductions.section80D, 75000) + hEx + stdDed));
-                                    taxVal = (tOld <= 500000 ? 0 : calculateOldRegimeTax(tOld)) * 1.04;
-                                }
-                                
-                                const isSelected = taxRegime === r;
-
-                                return (
-                                    <div key={r} onClick={() => setTaxRegime(r)} 
-                                        className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 relative overflow-hidden ${isSelected ? 'border-blue-500 bg-blue-600/10 shadow-lg shadow-blue-500/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}>
-                                        
-                                        <div className="flex justify-between items-center mb-3">
-                                            <span className="font-bold text-slate-300 uppercase text-xs tracking-[0.2em]">{r} Regime</span>
-                                            {isSelected && <CheckCircle2 className="text-blue-400 w-6 h-6" />}
-                                        </div>
-                                        
-                                        <div className="text-4xl font-bold text-white mb-2 tracking-tighter">
-                                            {formatCurrency(taxVal)}
-                                        </div>
-                                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Estimated Liability</div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {/* STEP 4: REVIEW (FORENSIC AUDIT) */}
-                    {currentStep === 4 && (
-                        <div className="space-y-8 pt-4">
-                            <div className="text-center">
-                                <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Final Tax Payable</p>
-                                <h2 className="text-6xl font-black text-white tracking-tighter drop-shadow-2xl">
-                                    {formatCurrency(auditResult.tax)}
-                                </h2>
-                                <div className="inline-block mt-4 px-4 py-1 rounded-full bg-white/10 border border-white/10 text-xs font-bold text-slate-300 uppercase tracking-wider">
-                                    {taxRegime} Regime Applied
-                                </div>
-                            </div>
-                            
-                            {/* NEW: Audit Shield Component */}
-                            <AuditShield auditData={auditResult.audit} />
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
-                                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Total Income</p>
-                                    <p className="text-xl font-bold text-white">{formatCurrency(auditResult.grossIncome)}</p>
-                                </div>
-                                <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
-                                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Total Deductions</p>
-                                    <p className="text-xl font-bold text-emerald-400">{formatCurrency(auditResult.totalDeductions)}</p>
-                                </div>
-                            </div>
-
-                            <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex gap-3 text-left">
-                                <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                <p className="text-[11px] text-amber-200/80 leading-relaxed font-medium">
-                                    By clicking submit, you confirm that these details match your Form 16 / AIS. This record will be permanently saved to your profile.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                </motion.div>
-            </AnimatePresence>
-
-            {/* Bottom Actions */}
-            <div className="flex gap-4 mt-8 pt-6 border-t border-white/5">
-                {currentStep > 1 && (
-                    <button 
-                        onClick={() => setCurrentStep(p => p - 1)} 
-                        className="flex-1 py-4 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-bold text-xs uppercase tracking-widest transition-colors"
+              {currentStep === 4 && (
+                <div className="space-y-8">
+                  <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-8 rounded-[3rem] text-center shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16" />
+                    <p className="text-blue-100 text-[10px] uppercase font-black tracking-[0.3em] mb-3 opacity-80">
+                      Final Calculated Due
+                    </p>
+                    <motion.h2
+                      initial={{ scale: 0.9 }}
+                      animate={{ scale: 1 }}
+                      className="text-5xl font-black text-white tracking-tighter mb-4"
                     >
-                        Back
-                    </button>
-                )}
-                <button 
-                    onClick={() => currentStep === 4 ? handleFileITR() : setCurrentStep(p => p + 1)}
-                    disabled={isSubmitting}
-                    className="flex-[2] py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all flex items-center justify-center gap-2 group"
-                >
-                    {isSubmitting ? 'Processing...' : currentStep === 4 ? 'File ITR Now' : 'Continue'}
-                    {!isSubmitting && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
-                </button>
-            </div>
+                      {formatCurrency(
+                        taxRegime === "old"
+                          ? getTaxResults().oldRegimeTax
+                          : getTaxResults().newRegimeTax
+                      )}
+                    </motion.h2>
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-black/20 rounded-full border border-white/10">
+                      <Scale size={12} className="text-blue-200" />
+                      <span className="text-[9px] font-bold text-white uppercase tracking-widest">
+                        {taxRegime} Regime Applied
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/5 border border-white/10 rounded-3xl p-5 shadow-inner">
+                      <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">
+                        Gross Income
+                      </p>
+                      <p className="text-xl font-bold text-white tracking-tight">
+                        {formatCurrency(getTaxResults().totalIncome)}
+                      </p>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-3xl p-5 shadow-inner">
+                      <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">
+                        Total Savings
+                      </p>
+                      <p className="text-xl font-bold text-emerald-400 tracking-tight">
+                        {formatCurrency(getTaxResults().totalDeductions)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {currentStep === 5 && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {Object.keys(filingDetails).map((key) => (
+                      <div key={key} className="space-y-2">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest ml-1">
+                          {key.replace(/([A-Z])/g, " $1")}{" "}
+                          <InfoTooltip field={key} />
+                        </p>
+                        <input
+                          type="text"
+                          value={filingDetails[key]}
+                          onChange={(e) =>
+                            handleInputChange("filing", key, e.target.value)
+                          }
+                          className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 px-6 text-white focus:border-blue-500 outline-none uppercase placeholder:lowercase"
+                          placeholder={`Enter your ${key.replace(
+                            /([A-Z])/g,
+                            " $1"
+                          )}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-blue-600/5 border border-blue-500/10 p-5 rounded-[2rem] flex gap-4 mt-6">
+                    <AlertCircle className="w-5 h-5 text-blue-500 shrink-0" />
+                    <p className="text-[10px] text-slate-400 leading-relaxed italic font-medium">
+                      I hereby certify that the information provided is true and
+                      accurate according to my bank statements and 26AS records.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Liquid Navigation */}
+          <div className="flex gap-4 mt-12">
+            {currentStep > 1 && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setCurrentStep(currentStep - 1)}
+                className="flex-1 bg-white/5 border border-white/10 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center transition-colors hover:bg-white/10"
+              >
+                <ChevronLeft size={20} className="mr-2" /> Previous
+              </motion.button>
+            )}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() =>
+                currentStep < 5
+                  ? setCurrentStep(currentStep + 1)
+                  : alert("Submission Successful!")
+              }
+              className="flex-[2] bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-2xl shadow-blue-600/30 transition-all"
+            >
+              {currentStep === 4
+                ? "Review & File"
+                : currentStep === 5
+                ? "Submit Return"
+                : "Continue"}
+              <ChevronRight size={18} />
+            </motion.button>
+          </div>
         </div>
+        <p className="text-center text-[9px] text-slate-700 font-black uppercase tracking-[0.4em] py-4">
+          Ministry Approved Simulation • Secure Protocol
+        </p>
+      </div>
     </div>
   );
-}
+};
+
+export default ITRCalculator;

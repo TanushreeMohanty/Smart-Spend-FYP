@@ -6,10 +6,12 @@ import {
   Car, Gift, Smartphone, Activity 
 } from 'lucide-react';
 
-export const APP_VERSION = import.meta.env.VITE_APP_VERSION;
+// --- VERSION & METADATA ---
+export const APP_VERSION = import.meta.env.VITE_APP_VERSION || "1.0.0";
 export const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-const firebaseConfig = {
+// --- FIREBASE INIT ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -37,7 +39,16 @@ export const CATEGORIES = [
   { id: 'other', name: 'Other', icon: Activity, color: 'bg-slate-500/20 text-slate-300', keywords: [] },
 ];
 
-export const TABS = { HOME: 'home', HISTORY: 'history', ADD: 'add', AUDIT: 'audit', STATS: 'stats', WEALTH: 'wealth', PROFILE: 'profile' ,  ITR: 'itr' };
+export const TABS = { 
+  HOME: 'home', 
+  HISTORY: 'history', 
+  ADD: 'add', 
+  AUDIT: 'audit', 
+  STATS: 'stats', 
+  WEALTH: 'wealth', 
+  PROFILE: 'profile',
+  ITR: 'itr' 
+};
 
 export const UNITS = [ 
   { label: '₹', value: 1 }, 
@@ -55,17 +66,29 @@ export const TAX_CONSTANTS = {
     SECTION_80E: Infinity, 
     SECTION_24B: 200000, 
     SECTION_80TTA: 10000, 
-    STANDARD_DEDUCTION: 50000, 
+    STANDARD_DEDUCTION: 75000, 
     PRESUMPTIVE_44ADA: 0.50,
     PRESUMPTIVE_TURNOVER_LIMIT: 7500000
   },
   OLD_REGIME: { 
-    SLABS: [{ limit: 250000, rate: 0 }, { limit: 500000, rate: 0.05 }, { limit: 1000000, rate: 0.20 }, { limit: Infinity, rate: 0.30 }], 
+    SLABS: [
+        { limit: 250000, rate: 0 }, 
+        { limit: 500000, rate: 0.05 }, 
+        { limit: 1000000, rate: 0.20 }, 
+        { limit: Infinity, rate: 0.30 }
+    ], 
     REBATE_LIMIT: 500000, 
     CESS: 0.04 
   },
   NEW_REGIME: { 
-    SLABS: [{ limit: 300000, rate: 0 }, { limit: 600000, rate: 0.05 }, { limit: 900000, rate: 0.10 }, { limit: 1200000, rate: 0.15 }, { limit: 1500000, rate: 0.20 }, { limit: Infinity, rate: 0.30 }], 
+    SLABS: [
+        { limit: 300000, rate: 0 }, 
+        { limit: 700000, rate: 0.05 },  
+        { limit: 1000000, rate: 0.10 }, 
+        { limit: 1200000, rate: 0.15 }, 
+        { limit: 1500000, rate: 0.20 }, 
+        { limit: Infinity, rate: 0.30 }
+    ], 
     REBATE_LIMIT: 700000, 
     CESS: 0.04 
   }

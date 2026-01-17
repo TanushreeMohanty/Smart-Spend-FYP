@@ -6,23 +6,29 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar {
+  /* Custom Scrollbar */
+
+  /* width of the scrollbar */
+  ::-webkit-scrollbar {
     width: 6px;
   }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+
+  /* track/background of the scrollbar */
+  ::-webkit-scrollbar-track {
+    background: #ccc;
+    border-radius: 5px;
   }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 20px;
+
+  /* scrollbar handle/thumb */
+  ::-webkit-scrollbar-thumb {
+    background: blue;
+    border-radius: 24px;
+    max-height: 200px; /* optional, controls vertical height */
   }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+
+  /* optional: hover effect */
+  ::-webkit-scrollbar-thumb:hover {
+    background: darkblue;
   }
 }
 
@@ -37,16 +43,16 @@ body {
   body {
     background-color: white !important;
     color: black !important;
-    font-family: 'Times New Roman', serif;
+    font-family: "Times New Roman", serif;
   }
 
   /* Hide UI elements */
-  .no-print, 
-  nav, 
-  button, 
-  header, 
-  .fixed.bottom-6 { 
-    display: none !important; 
+  .no-print,
+  nav,
+  button,
+  header,
+  .fixed.bottom-6 {
+    display: none !important;
   }
 
   /* Reset Layout for Paper */
@@ -57,8 +63,8 @@ body {
   }
 
   /* Card Styling for Print */
-  .bg-white\/5, 
-  .bg-gradient-to-br, 
+  .bg-white\/5,
+  .bg-gradient-to-br,
   .bg-\[\#0f172a\] {
     background: white !important;
     border: 1px solid #ddd !important;
@@ -70,16 +76,21 @@ body {
   }
 
   /* Typography Overrides */
-  .text-white, .text-slate-300, .text-slate-400, .text-emerald-300, .text-rose-300 {
+  .text-white,
+  .text-slate-300,
+  .text-slate-400,
+  .text-emerald-300,
+  .text-rose-300 {
     color: #000 !important;
   }
-  
+
   .text-slate-500 {
     color: #666 !important;
   }
 
   /* Specific overrides for visibility */
-  .bg-emerald-500\/10, .bg-rose-500\/10 {
+  .bg-emerald-500\/10,
+  .bg-rose-500\/10 {
     background: transparent !important;
     border: 1px solid #000 !important;
   }
