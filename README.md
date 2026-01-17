@@ -27,57 +27,57 @@ A comprehensive Personal Finance PWA tailored for the Indian market, featuring A
 ### For Repo Creator (Tanu)
 
 #### A. Initial Setup (One-time only)
-- 1. Clone your repository
+- 1. Clone your repository <br>
 ```git clone https://github.com/TanushreeMohanty/Smart-Spend-FYP.git```
 
-- 2. Enter the directory
+- 2. Enter the directory <br>
 ```cd Smart-Spend-FYP```
 
 #### B. Reviewing & Merging Code 
 (Run this when a team member has finished a task.)
 
-- 1. Get the latest updates from GitHub
+- 1. Get the latest updates from GitHub <br>
 ```git fetch origin```
 
-- 2. Switch to the team member's branch to test their code
+- 2. Switch to the team member's branch to test their code <br>
 ```git checkout team-member-branch-name```
 
-- 3. ... Test the app to ensure it works ...
+- 3. ... Test the app to ensure it works ... <br>
 ```npm run dev```
 
-- 4. If it works, switch back to main
+- 4. If it works, switch back to main <br>
 ```git checkout main```
 
-- 5. Merge their work into the main code
+- 5. Merge their work into the main code <br>
 ```git merge team-member-branch-name```
 
-- 6. Push the updated main code to GitHub
+- 6. Push the updated main code to GitHub <br>
 ```git push origin main```
 
 ### For team members (Rohin & Shubham)
 
 #### A. Initial Setup (One-time only)
-- 1. Clone your repository
+- 1. Clone your repository <br>
 ```git clone https://github.com/TanushreeMohanty/Smart-Spend-FYP.git```
 
-- 2. Enter the directory
+- 2. Enter the directory <br>
 ```cd Smart-Spend-FYP```
 
 #### B. Daily Work Cycle
-- 1. VITAL: Switch to main and get the latest code
-```git checkout main```
+- 1. VITAL: Switch to main and get the latest code <br>
+```git checkout main``` <br>
 ```git pull origin main```
 
-- 2. Create a new branch for your task (Replace 'feature/login-page' with your actual task name)
+- 2. Create a new branch for your task (Replace 'feature/login-page' with your actual task name) <br>
 ```git checkout -b feature/login-page```
 
 - 3. ... Write your code and make changes ...
 
-- 4. Save your changes locally
-```git add .```
-```git commit -m "Description of what you added"```
+- 4. Save your changes locally <br>
+```git add .``` <br>
+```git commit -m "Description of what you added"``` 
 
-- 5. Upload your branch to GitHub
+- 5. Upload your branch to GitHub <br>
 ```git push origin feature/login-page```
 
 #### C. Finalizing (Pull Request)
