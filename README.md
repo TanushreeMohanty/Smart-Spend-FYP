@@ -1,4 +1,4 @@
-# SmartSpend Pro tanuuu
+# SmartSpend Pro
 
 **Version:** v5.3.0  
 **Type:** Final Year Project (FYP)
@@ -85,7 +85,7 @@ A comprehensive Personal Finance PWA tailored for the Indian market, featuring A
 
 - 2. You will see a banner saying "Compare & pull request".
 
-- 3. Click it, write a short title, and click Create Pull Request to notify the Owner and Do not click on any merge button.
+- 3. Click it, write a short title, and click Create Pull Request to notify the Owner.
 
 
 
