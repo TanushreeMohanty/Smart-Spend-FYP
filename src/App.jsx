@@ -26,7 +26,7 @@ import { Toast, Loading, ConfirmationDialog } from "./components/ui/Shared";
 import WelcomeWizard from "./components/onboarding/WelcomeWizard";
 
 // Pages
-import LoginScreen from "./pages/LoginScreen";
+import LoginScreen from "./pages/LoginScreen"; // Login Screen
 import HomePage from "./pages/HomePage"; // Section 1
 import HistoryPage from "./pages/HistoryPage"; // Section 2
 import AddPage from "./pages/AddPage"; // Section 3
@@ -34,7 +34,7 @@ import AuditPage from "./pages/AuditPage"; // Section 4
 import StatsPage from "./pages/StatsPage"; // Section 5
 import WealthPage from "./pages/WealthPage"; // Section 6
 import ProfilePage from "./pages/ProfilePage"; // Section 7
-import ITRPage from "./pages/ITRPage"; // 
+import ITRPage from "./pages/ITRPage"; // ITR Wizard
 
 export default function App() {
   // --- 1. Global State (Original Logic) ---
