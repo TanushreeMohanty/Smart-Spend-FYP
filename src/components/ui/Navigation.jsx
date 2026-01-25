@@ -8,13 +8,13 @@ export const Navigation = ({ activeTab, setActiveTab, onSignOut }) => {
   
   // Defined tabs with labels for the tooltip
   const navItems = [
-    { id: TABS.HOME, icon: Home, label: "Home" },
-    { id: TABS.HISTORY, icon: ListFilter, label: "History" },
-    { id: TABS.ADD, icon: Plus, label: "Add New" },
-    { id: TABS.AUDIT, icon: ClipboardCheck, label: "Tax Audit" },
-    { id: TABS.STATS, icon: PieChart, label: "Stats" },
-    { id: TABS.WEALTH, icon: Landmark, label: "Wealth" },
-    { id: TABS.PROFILE, icon: User, label: "Profile" }
+    { id: TABS.HOME, icon: Home, label: "Home" }, //Section 1
+    { id: TABS.HISTORY, icon: ListFilter, label: "History" }, //Section 2
+    { id: TABS.ADD, icon: Plus, label: "Add New" }, //Section 3 
+    { id: TABS.AUDIT, icon: ClipboardCheck, label: "Tax Audit" }, //Section 4
+    { id: TABS.STATS, icon: PieChart, label: "Stats" }, //Section 5
+    { id: TABS.WEALTH, icon: Landmark, label: "Wealth" }, //Section 6
+    { id: TABS.PROFILE, icon: User, label: "Profile" } //Section 7
   ];
 
   return (

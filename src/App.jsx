@@ -27,14 +27,14 @@ import WelcomeWizard from "./components/onboarding/WelcomeWizard";
 
 // Pages
 import LoginScreen from "./pages/LoginScreen";
-import HomePage from "./pages/HomePage";
-import HistoryPage from "./pages/HistoryPage";
-import AddPage from "./pages/AddPage";
-import AuditPage from "./pages/AuditPage";
-import StatsPage from "./pages/StatsPage";
-import WealthPage from "./pages/WealthPage";
-import ProfilePage from "./pages/ProfilePage";
-import ITRPage from "./pages/ITRPage";
+import HomePage from "./pages/HomePage"; // Section 1
+import HistoryPage from "./pages/HistoryPage"; // Section 2
+import AddPage from "./pages/AddPage"; // Section 3
+import AuditPage from "./pages/AuditPage"; // Section 4
+import StatsPage from "./pages/StatsPage"; // Section 5
+import WealthPage from "./pages/WealthPage"; // Section 6
+import ProfilePage from "./pages/ProfilePage"; // Section 7
+import ITRPage from "./pages/ITRPage"; // 
 
 export default function App() {
   // --- 1. Global State (Original Logic) ---

@@ -1,3 +1,4 @@
+// Section 5 Stats Page
 import React, { useState, useMemo } from 'react';
 import { 
   Bot, Sparkles, Loader2, PieChart, BarChart3, TrendingUp, 

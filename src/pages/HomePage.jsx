@@ -1,3 +1,4 @@
+// Section 1 Home Page
 import React, { useMemo } from "react";
 import { motion } from "framer-motion";
 import {

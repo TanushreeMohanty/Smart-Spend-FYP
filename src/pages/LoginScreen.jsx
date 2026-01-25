@@ -1,3 +1,4 @@
+// Login Screen Page
 import React from 'react';
 import { Wallet } from 'lucide-react';
 import { APP_VERSION } from '../config/constants';

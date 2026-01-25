@@ -1,3 +1,4 @@
+// Section 3 Add New Page
 import React, { useState, useRef, useEffect } from "react";
 import {
   writeBatch,

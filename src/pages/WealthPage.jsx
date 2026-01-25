@@ -1,3 +1,4 @@
+// Section 6 Wealth Page
 import React, { useState } from 'react';
 import { collection, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from 'recharts'; // New Imports
