@@ -1,6 +1,9 @@
 // Login Page
 import React from 'react';
-import { Wallet } from 'lucide-react';
+import { 
+  Wallet, TrendingUp, DollarSign, PieChart, CreditCard, 
+  Landmark, Coins, PiggyBank, Receipt, Briefcase, Gem 
+} from 'lucide-react';
 import { APP_VERSION } from '../config/constants';
 
 const LoginScreen = ({ onLoginGoogle, onGuest, error }) => (
