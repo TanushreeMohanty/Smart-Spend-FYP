@@ -12,6 +12,14 @@ export default {
       },
       animation: {
         'spin-slow': 'spin 3s linear infinite',
+        'bounce-slow': 'bounce 3s infinite',
+        'shimmer': 'shimmer 1.5s infinite',
+      },
+      keyframes: {
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(200%)' },
+        }
       }
     },
   },

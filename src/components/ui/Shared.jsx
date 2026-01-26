@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { Wallet } from 'lucide-react';
 
 export const Toast = ({ message, type, isVisible, onClose }) => {
   if (!isVisible) return null;
@@ -15,11 +16,52 @@ export const Toast = ({ message, type, isVisible, onClose }) => {
   );
 };
 
+// Loading Screen Component
 export const Loading = ({ message }) => (
-  <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white">
-    <div className="w-16 h-16 border-t-4 border-l-4 border-blue-400 rounded-full animate-spin mb-6"></div>
-    <p className="text-blue-100 font-bold text-xl tracking-wider animate-pulse">SMARTSPEND PRO</p>
-    {message && <p className="text-slate-400 text-sm mt-2">{message}</p>}
+  <div className="relative flex flex-col items-center justify-center min-h-screen bg-slate-950 overflow-hidden">
+    
+    {/* 1. Background Effects (Ambient Glows) */}
+    <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
+        {/* Main Blue Glow */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] animate-pulse" />
+        {/* Secondary Cyan Glow (Replaced Purple) */}
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-[100px] animate-pulse delay-700" />
+    </div>
+
+    <div className="relative z-10 flex flex-col items-center">
+      {/* 2. The Spinner Container */}
+      <div className="relative w-24 h-24 mb-8">
+        
+        {/* Outer Ring (Primary Blue) */}
+        <div className="absolute inset-0 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+        
+        {/* Inner Ring (Cyan/Sky - Replaced Purple) */}
+        <div className="absolute inset-3 border-4 border-cyan-500/20 border-b-cyan-500 rounded-full animate-spin duration-[3s]" />
+        
+        {/* Center Icon (Pulsing) */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="bg-slate-900/50 backdrop-blur-sm p-3 rounded-full border border-white/10 shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse">
+             <Wallet className="w-6 h-6 text-blue-400" />
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Brand Text */}
+      {/* Gradient now goes form Blue -> Cyan -> Blue */}
+      <h1 className="text-2xl font-black tracking-[0.2em] bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-400 animate-gradient-x mb-4">
+        Spendsy
+      </h1>
+
+      {/* 4. Loading Message Pill */}
+      {message && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce" />
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce delay-100" />
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce delay-200" />
+          <span className="text-slate-400 text-xs font-medium ml-2">{message}</span>
+        </div>
+      )}
+    </div>
   </div>
 );
 
