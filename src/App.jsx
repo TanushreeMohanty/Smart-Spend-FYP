@@ -303,128 +303,183 @@ export default function App() {
           "max-w-6xl px-12" // Always desktop
         )}
       >
-        {![TABS.PROFILE, TABS.HISTORY, TABS.AUDIT, TABS.ITR].includes(
-          activeTab
-        ) && (
-          <header
+{/* // --- Header Starts --- */}
+{![TABS.PROFILE,TABS.ITR].includes(activeTab) && (
+  <header
+    className={cn(
+      "z-40 pt-10 pb-2 transition-all duration-500",
+      isHeaderPinned
+        ? "sticky top-0 backdrop-blur-xl border-b border-white/5"
+        : "relative"
+    )}
+    style={{ opacity: scrollOpacity }}
+  >
+    <div className="flex items-center justify-between mb-2 px-2">
+      
+      {/* 1. CONFIG: LEFT CONTENT (Branding & User Name) 
+      */}
+      {[TABS.HOME,TABS.HISTORY, TABS.ADD, TABS.AUDIT,TABS.STATS,TABS.WEALTH].includes(activeTab) ? (
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 bg-blue-500/10 rounded-lg">
+              <Zap className="w-3.5 h-3.5 text-blue-500 fill-blue-500" />
+            </div>
+            <span className="text-[11px] font-bold tracking-[0.3em] uppercase opacity-60">
+              Spendsy
+            </span>
+          </div>
+          <h1 className="text-4xl font-black tracking-tight leading-tight">
+            <span
+              className={theme === "dark" ? "text-white" : "text-slate-900"}
+            >
+              {displayName}
+            </span>
+          </h1>
+        </div>
+      ) : (
+        <div /> /* Spacer to keep Right content on the right if Left is hidden */
+      )}
+
+      {/* 2. CONFIG: RIGHT CONTENT (Theme & Pin Buttons) 
+      */}
+      {[TABS.HOME, TABS.ADD, TABS.STATS].includes(activeTab) && (
+        <div className="flex gap-2 p-1 bg-white/5 border border-white/10 backdrop-blur-md rounded-full shadow-lg">
+          <button
+            onClick={toggleTheme}
             className={cn(
-              "z-40 pt-10 pb-6 transition-all duration-500",
-              isHeaderPinned ? "sticky top-0 backdrop-blur-3xl" : "relative"
+              "p-3 rounded-full transition-all duration-300 active:scale-90",
+              theme === "dark"
+                ? "hover:bg-white/10 text-amber-400"
+                : "hover:bg-slate-200 text-blue-600"
             )}
-            style={{ opacity: scrollOpacity }}
           >
-            <div className="flex items-center justify-between mb-10 px-2">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-1">
-                  <Zap className="w-3.5 h-3.5 text-blue-500 fill-blue-500" />
-                  <span className="text-[10px] font-black tracking-[0.4em] uppercase opacity-50">
-                    Spendsy
+            {theme === "dark" ? (
+              <Sun className="w-4 h-4" />
+            ) : (
+              <Moon className="w-4 h-4" />
+            )}
+          </button>
+          <button
+            onClick={togglePin}
+            className={cn(
+              "p-3 rounded-full transition-all duration-300 active:scale-90",
+              isHeaderPinned
+                ? "bg-blue-500 text-white shadow-md"
+                : "hover:bg-white/10 text-slate-400"
+            )}
+          >
+            {isHeaderPinned ? (
+              <Pin className="w-4 h-4 fill-current" />
+            ) : (
+              <PinOff className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+
+    {/* 3. CONFIG: HERO CARD (Current Balance & Stats) 
+    */}
+    {[TABS.HOME, TABS.ADD, TABS.STATS].includes(activeTab) && (
+      <motion.div
+        whileHover={{ scale: 1.01, y: -2 }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        className={cn(
+          "relative overflow-hidden rounded-[2.5rem] p-8 sm:p-10 transition-all duration-500 border",
+          theme === "dark"
+            ? "bg-gradient-to-br from-white/[0.08] to-white/[0.02] border-white/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)]"
+            : "bg-gradient-to-br from-white to-slate-50 border-white/60 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)]"
+        )}
+      >
+        {/* Ambient Background Glows */}
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/20 blur-[80px] rounded-full pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500/10 blur-[80px] rounded-full pointer-events-none" />
+
+        <div className="relative z-10">
+          {/* Card Header Label */}
+          <div className="flex items-center gap-2 mb-6 opacity-50">
+            <LayoutIcon className="w-4 h-4" />
+            <p className="text-xs font-bold uppercase tracking-widest">
+              {activeTab === TABS.WEALTH ? "Net Valuation" : "Total Balance"}
+            </p>
+          </div>
+
+          {/* Main Balance Figure */}
+          <h2
+            className={cn(
+              "text-5xl sm:text-7xl font-black mb-10 tracking-tighter tabular-nums bg-clip-text text-transparent bg-gradient-to-r",
+              theme === "dark"
+                ? "from-white via-white to-white/70"
+                : "from-slate-900 via-slate-800 to-slate-600"
+            )}
+          >
+            {activeTab === TABS.WEALTH
+              ? formatIndianCompact(netWorth.assets - netWorth.liabilities)
+              : `₹${balance.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                })}`}
+          </h2>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-4 sm:gap-6">
+            {/* Income Tile */}
+            <div
+              className={cn(
+                "group p-5 rounded-[2rem] border transition-all duration-300",
+                theme === "dark"
+                  ? "bg-black/20 border-white/5 hover:bg-white/5"
+                  : "bg-white/50 border-slate-200/60 hover:bg-white"
+              )}
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />
+                  </div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-500/80">
+                    Income
                   </span>
                 </div>
-                <h1 className="text-4xl font-black tracking-tight">
-                  {displayName}
-                  <span className="text-blue-500">.</span>
-                </h1>
-              </div>
-
-              <div className="flex gap-2 p-1.5 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-2xl shadow-2xl">
-                <button
-                  onClick={toggleTheme}
-                  className="p-2.5 rounded-xl hover:bg-blue-500/20 transition-all active:scale-95"
-                >
-                  {theme === "dark" ? (
-                    <Sun className="w-4 h-4 text-amber-400" />
-                  ) : (
-                    <Moon className="w-4 h-4 text-blue-600" />
-                  )}
-                </button>
-                <button
-                  onClick={togglePin}
-                  className="p-2.5 rounded-xl transition-all active:scale-95"
-                >
-                  {isHeaderPinned ? (
-                    <Pin className="w-4 h-4 text-blue-500 fill-current" />
-                  ) : (
-                    <PinOff className="w-4 h-4 opacity-20" />
-                  )}
-                </button>
+                <p className="font-bold text-2xl tracking-tight tabular-nums">
+                  {activeTab === TABS.WEALTH
+                    ? formatIndianCompact(netWorth.assets)
+                    : `₹${totals.income.toLocaleString("en-IN")}`}
+                </p>
               </div>
             </div>
 
-            {/* DASHBOARD CARD - SNAPPY SPRING */}
-            <motion.div
-              whileHover={{ scale: 1.02, y: -5 }}
-              transition={{ type: "spring", stiffness: 400, damping: 15 }}
+            {/* Expense Tile */}
+            <div
               className={cn(
-                "relative group overflow-hidden rounded-[3rem] border p-10 transition-all duration-500",
+                "group p-5 rounded-[2rem] border transition-all duration-300",
                 theme === "dark"
-                  ? "bg-white/[0.03] border-white/10 shadow-[0_40px_80px_-15px_rgba(0,0,0,0.6)] backdrop-blur-3xl"
-                  : "bg-white border-white/50 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.12)]"
+                  ? "bg-black/20 border-white/5 hover:bg-white/5"
+                  : "bg-white/50 border-slate-200/60 hover:bg-white"
               )}
             >
-              <div className="absolute -top-32 -right-32 w-80 h-80 bg-blue-500/10 blur-[100px] rounded-full group-hover:bg-blue-500/20 transition-all duration-1000" />
-
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-4 opacity-40">
-                  <LayoutIcon className="w-4 h-4" />
-                  <p className="text-[11px] font-black uppercase tracking-[0.3em]">
-                    {activeTab === TABS.WEALTH
-                      ? "Net Valuation"
-                      : "Current Balance"}
-                  </p>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-full bg-rose-500/10 border border-rose-500/20">
+                    <ArrowUp className="w-3.5 h-3.5 text-rose-500" />
+                  </div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-rose-500/80">
+                    Expense
+                  </span>
                 </div>
-
-                <h2 className="text-5xl sm:text-7xl font-black mb-12 tracking-tighter">
+                <p className="font-bold text-2xl tracking-tight tabular-nums">
                   {activeTab === TABS.WEALTH
-                    ? formatIndianCompact(
-                        netWorth.assets - netWorth.liabilities
-                      )
-                    : `₹${balance.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}`}
-                </h2>
-
-                <div className="grid grid-cols-2 gap-6">
-                  {/* SOLID TILES FOR LIGHT MODE */}
-                  <div
-                    className={cn(
-                      "p-6 rounded-[2.2rem] border transition-all hover:scale-[1.03]",
-                      theme === "dark"
-                        ? "bg-white/5 border-white/5"
-                        : "bg-[#f8fafc] border-slate-100"
-                    )}
-                  >
-                    <div className="flex items-center text-emerald-500 text-[10px] mb-2 font-black uppercase tracking-widest">
-                      <ArrowDown className="w-3.5 h-3.5 mr-1" /> Income
-                    </div>
-                    <p className="font-bold text-2xl tracking-tight">
-                      {activeTab === TABS.WEALTH
-                        ? formatIndianCompact(netWorth.assets)
-                        : `₹${totals.income.toLocaleString("en-IN")}`}
-                    </p>
-                  </div>
-                  <div
-                    className={cn(
-                      "p-6 rounded-[2.2rem] border transition-all hover:scale-[1.03]",
-                      theme === "dark"
-                        ? "bg-white/5 border-white/5"
-                        : "bg-[#f8fafc] border-slate-100"
-                    )}
-                  >
-                    <div className="flex items-center text-rose-500 text-[10px] mb-2 font-black uppercase tracking-widest">
-                      <ArrowUp className="w-3.5 h-3.5 mr-1" /> Expense
-                    </div>
-                    <p className="font-bold text-2xl tracking-tight">
-                      {activeTab === TABS.WEALTH
-                        ? formatIndianCompact(netWorth.liabilities)
-                        : `₹${totals.expenses.toLocaleString("en-IN")}`}
-                    </p>
-                  </div>
-                </div>
+                    ? formatIndianCompact(netWorth.liabilities)
+                    : `₹${totals.expenses.toLocaleString("en-IN")}`}
+                </p>
               </div>
-            </motion.div>
-          </header>
-        )}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    )}
+  </header>
+)}
+{/* // --- Header Ends --- */}
 
         <main
           className={cn(
