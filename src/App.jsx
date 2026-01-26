@@ -72,7 +72,7 @@ export default function App() {
   });
   const [showWizard, setShowWizard] = useState(false);
   const [theme, setTheme] = useState(
-    () => localStorage.getItem("app_theme") || "dark"
+    () => localStorage.getItem("app_theme") || "dark",
   );
   const layoutMode = "desktop-full"; // Force desktop view
   // Removed toggleLayout function and state
@@ -157,9 +157,9 @@ export default function App() {
           else acc.expenses += amt;
           return acc;
         },
-        { income: 0, expenses: 0 }
+        { income: 0, expenses: 0 },
       ),
-    [transactions]
+    [transactions],
   );
 
   const netWorth = useMemo(
@@ -171,9 +171,9 @@ export default function App() {
           else acc.liabilities += amt;
           return acc;
         },
-        { assets: 0, liabilities: 0 }
+        { assets: 0, liabilities: 0 },
       ),
-    [wealthItems]
+    [wealthItems],
   );
 
   const balance = totals.income - totals.expenses;
@@ -200,7 +200,7 @@ export default function App() {
     triggerConfirm("Permanently delete?", () => deleteTransaction(id));
   const requestBulkDelete = (items) =>
     triggerConfirm(`Delete ${items.length} items?`, () =>
-      bulkDeleteTransactions(items)
+      bulkDeleteTransactions(items),
     );
 
   // --- 7. RENDER ---
@@ -220,7 +220,7 @@ export default function App() {
         "min-h-screen transition-colors duration-1000 font-sans pb-28 md:pb-0 md:pl-28 scroll-smooth selection:bg-blue-500",
         theme === "dark"
           ? "bg-[#08090a] text-white"
-          : "bg-[#cfd9e5] text-slate-900"
+          : "bg-[#cfd9e5] text-slate-900",
       )}
     >
       {/* BACKGROUND SYSTEM */}
@@ -300,195 +300,207 @@ export default function App() {
       <div
         className={cn(
           "mx-auto min-h-screen relative z-10 transition-all duration-700",
-          "max-w-6xl px-12" // Always desktop
+          "max-w-6xl px-12", // Always desktop
         )}
       >
-{/* // --- Header Starts --- */}
-{![TABS.PROFILE,TABS.ITR].includes(activeTab) && (
-  <header
-    className={cn(
-      "z-40 pt-10 pb-2 transition-all duration-500",
-      isHeaderPinned
-        ? "sticky top-0 backdrop-blur-xl border-b border-white/5"
-        : "relative"
-    )}
-    style={{ opacity: scrollOpacity }}
-  >
-    <div className="flex items-center justify-between mb-2 px-2">
-      
-      {/* 1. CONFIG: LEFT CONTENT (Branding & User Name) 
-      */}
-      {[TABS.HOME,TABS.HISTORY, TABS.ADD, TABS.AUDIT,TABS.STATS,TABS.WEALTH].includes(activeTab) ? (
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 bg-blue-500/10 rounded-lg">
-              <Zap className="w-3.5 h-3.5 text-blue-500 fill-blue-500" />
-            </div>
-            <span className="text-[11px] font-bold tracking-[0.3em] uppercase opacity-60">
-              Spendsy
-            </span>
-          </div>
-          <h1 className="text-4xl font-black tracking-tight leading-tight">
-            <span
-              className={theme === "dark" ? "text-white" : "text-slate-900"}
-            >
-              {displayName}
-            </span>
-          </h1>
-        </div>
-      ) : (
-        <div /> /* Spacer to keep Right content on the right if Left is hidden */
-      )}
-
-      {/* 2. CONFIG: RIGHT CONTENT (Theme & Pin Buttons) 
-      */}
-      {[TABS.HOME, TABS.ADD, TABS.STATS].includes(activeTab) && (
-        <div className="flex gap-2 p-1 bg-white/5 border border-white/10 backdrop-blur-md rounded-full shadow-lg">
-          <button
-            onClick={toggleTheme}
+        {/* // --- Header Starts --- */}
+        {![TABS.PROFILE, TABS.ITR].includes(activeTab) && (
+          <header
             className={cn(
-              "p-3 rounded-full transition-all duration-300 active:scale-90",
-              theme === "dark"
-                ? "hover:bg-white/10 text-amber-400"
-                : "hover:bg-slate-200 text-blue-600"
-            )}
-          >
-            {theme === "dark" ? (
-              <Sun className="w-4 h-4" />
-            ) : (
-              <Moon className="w-4 h-4" />
-            )}
-          </button>
-          <button
-            onClick={togglePin}
-            className={cn(
-              "p-3 rounded-full transition-all duration-300 active:scale-90",
+              "z-40 pt-10 pb-2 transition-all duration-500",
               isHeaderPinned
-                ? "bg-blue-500 text-white shadow-md"
-                : "hover:bg-white/10 text-slate-400"
+                ? "sticky top-0 backdrop-blur-xl border-b border-white/5"
+                : "relative",
             )}
+            style={{ opacity: scrollOpacity }}
           >
-            {isHeaderPinned ? (
-              <Pin className="w-4 h-4 fill-current" />
-            ) : (
-              <PinOff className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-      )}
-    </div>
+            <div className="flex items-center justify-between mb-2 px-2">
+              {/* 1. CONFIG: LEFT CONTENT (Branding & User Name)
+               */}
+              {[
+                TABS.HOME,
+                TABS.HISTORY,
+                TABS.ADD,
+                TABS.AUDIT,
+                TABS.STATS,
+                TABS.WEALTH,
+              ].includes(activeTab) ? (
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-blue-500/10 rounded-lg">
+                      <Zap className="w-3.5 h-3.5 text-blue-500 fill-blue-500" />
+                    </div>
+                    <span className="text-[11px] font-bold tracking-[0.3em] uppercase opacity-60">
+                      Spendsy
+                    </span>
+                  </div>
+                  <h1 className="text-4xl font-black tracking-tight leading-tight">
+                    <span
+                      className={
+                        theme === "dark" ? "text-white" : "text-slate-900"
+                      }
+                    >
+                      {displayName}
+                    </span>
+                  </h1>
+                </div>
+              ) : (
+                <div /> /* Spacer to keep Right content on the right if Left is hidden */
+              )}
 
-    {/* 3. CONFIG: HERO CARD (Current Balance & Stats) 
-    */}
-    {[TABS.HOME, TABS.ADD, TABS.STATS].includes(activeTab) && (
-      <motion.div
-        whileHover={{ scale: 1.01, y: -2 }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        className={cn(
-          "relative overflow-hidden rounded-[2.5rem] p-8 sm:p-10 transition-all duration-500 border",
-          theme === "dark"
-            ? "bg-gradient-to-br from-white/[0.08] to-white/[0.02] border-white/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)]"
-            : "bg-gradient-to-br from-white to-slate-50 border-white/60 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)]"
+              {/* 2. CONFIG: RIGHT CONTENT (Theme & Pin Buttons)
+               */}
+              {[TABS.HOME, TABS.ADD, TABS.STATS].includes(activeTab) && (
+                <div className="flex gap-2 p-1 bg-white/5 border border-white/10 backdrop-blur-md rounded-full shadow-lg">
+                  <button
+                    onClick={toggleTheme}
+                    className={cn(
+                      "p-3 rounded-full transition-all duration-300 active:scale-90",
+                      theme === "dark"
+                        ? "hover:bg-white/10 text-amber-400"
+                        : "hover:bg-slate-200 text-blue-600",
+                    )}
+                  >
+                    {theme === "dark" ? (
+                      <Sun className="w-4 h-4" />
+                    ) : (
+                      <Moon className="w-4 h-4" />
+                    )}
+                  </button>
+                  <button
+                    onClick={togglePin}
+                    className={cn(
+                      "p-3 rounded-full transition-all duration-300 active:scale-90",
+                      isHeaderPinned
+                        ? "bg-blue-500 text-white shadow-md"
+                        : "hover:bg-white/10 text-slate-400",
+                    )}
+                  >
+                    {isHeaderPinned ? (
+                      <Pin className="w-4 h-4 fill-current" />
+                    ) : (
+                      <PinOff className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 3. CONFIG: HERO CARD (Current Balance & Stats)
+             */}
+            {[TABS.HOME, TABS.ADD, TABS.STATS].includes(activeTab) && (
+              <motion.div
+                whileHover={{ scale: 1.01, y: -2 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className={cn(
+                  "relative overflow-hidden rounded-[2.5rem] p-8 sm:p-10 transition-all duration-500 border",
+                  theme === "dark"
+                    ? "bg-gradient-to-br from-white/[0.08] to-white/[0.02] border-white/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)]"
+                    : "bg-gradient-to-br from-white to-slate-50 border-white/60 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)]",
+                )}
+              >
+                {/* Ambient Background Glows */}
+                <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/20 blur-[80px] rounded-full pointer-events-none" />
+                <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500/10 blur-[80px] rounded-full pointer-events-none" />
+
+                <div className="relative z-10">
+                  {/* Card Header Label */}
+                  <div className="flex items-center gap-2 mb-6 opacity-50">
+                    <LayoutIcon className="w-4 h-4" />
+                    <p className="text-xs font-bold uppercase tracking-widest">
+                      {activeTab === TABS.WEALTH
+                        ? "Net Valuation"
+                        : "Total Balance"}
+                    </p>
+                  </div>
+
+                  {/* Main Balance Figure */}
+                  <h2
+                    className={cn(
+                      "text-5xl sm:text-7xl font-black mb-10 tracking-tighter tabular-nums bg-clip-text text-transparent bg-gradient-to-r",
+                      theme === "dark"
+                        ? "from-white via-white to-white/70"
+                        : "from-slate-900 via-slate-800 to-slate-600",
+                    )}
+                  >
+                    {activeTab === TABS.WEALTH
+                      ? formatIndianCompact(
+                          netWorth.assets - netWorth.liabilities,
+                        )
+                      : `₹${balance.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}`}
+                  </h2>
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 gap-4 sm:gap-6">
+                    {/* Income Tile */}
+                    <div
+                      className={cn(
+                        "group p-5 rounded-[2rem] border transition-all duration-300",
+                        theme === "dark"
+                          ? "bg-black/20 border-white/5 hover:bg-white/5"
+                          : "bg-white/50 border-slate-200/60 hover:bg-white",
+                      )}
+                    >
+                      <div className="flex flex-col gap-4">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                            <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />
+                          </div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-500/80">
+                            Income
+                          </span>
+                        </div>
+                        <p className="font-bold text-2xl tracking-tight tabular-nums">
+                          {activeTab === TABS.WEALTH
+                            ? formatIndianCompact(netWorth.assets)
+                            : `₹${totals.income.toLocaleString("en-IN")}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Expense Tile */}
+                    <div
+                      className={cn(
+                        "group p-5 rounded-[2rem] border transition-all duration-300",
+                        theme === "dark"
+                          ? "bg-black/20 border-white/5 hover:bg-white/5"
+                          : "bg-white/50 border-slate-200/60 hover:bg-white",
+                      )}
+                    >
+                      <div className="flex flex-col gap-4">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 rounded-full bg-rose-500/10 border border-rose-500/20">
+                            <ArrowUp className="w-3.5 h-3.5 text-rose-500" />
+                          </div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-rose-500/80">
+                            Expense
+                          </span>
+                        </div>
+                        <p className="font-bold text-2xl tracking-tight tabular-nums">
+                          {activeTab === TABS.WEALTH
+                            ? formatIndianCompact(netWorth.liabilities)
+                            : `₹${totals.expenses.toLocaleString("en-IN")}`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </header>
         )}
-      >
-        {/* Ambient Background Glows */}
-        <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/20 blur-[80px] rounded-full pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500/10 blur-[80px] rounded-full pointer-events-none" />
-
-        <div className="relative z-10">
-          {/* Card Header Label */}
-          <div className="flex items-center gap-2 mb-6 opacity-50">
-            <LayoutIcon className="w-4 h-4" />
-            <p className="text-xs font-bold uppercase tracking-widest">
-              {activeTab === TABS.WEALTH ? "Net Valuation" : "Total Balance"}
-            </p>
-          </div>
-
-          {/* Main Balance Figure */}
-          <h2
-            className={cn(
-              "text-5xl sm:text-7xl font-black mb-10 tracking-tighter tabular-nums bg-clip-text text-transparent bg-gradient-to-r",
-              theme === "dark"
-                ? "from-white via-white to-white/70"
-                : "from-slate-900 via-slate-800 to-slate-600"
-            )}
-          >
-            {activeTab === TABS.WEALTH
-              ? formatIndianCompact(netWorth.assets - netWorth.liabilities)
-              : `₹${balance.toLocaleString("en-IN", {
-                  minimumFractionDigits: 2,
-                })}`}
-          </h2>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-4 sm:gap-6">
-            {/* Income Tile */}
-            <div
-              className={cn(
-                "group p-5 rounded-[2rem] border transition-all duration-300",
-                theme === "dark"
-                  ? "bg-black/20 border-white/5 hover:bg-white/5"
-                  : "bg-white/50 border-slate-200/60 hover:bg-white"
-              )}
-            >
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                    <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />
-                  </div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-500/80">
-                    Income
-                  </span>
-                </div>
-                <p className="font-bold text-2xl tracking-tight tabular-nums">
-                  {activeTab === TABS.WEALTH
-                    ? formatIndianCompact(netWorth.assets)
-                    : `₹${totals.income.toLocaleString("en-IN")}`}
-                </p>
-              </div>
-            </div>
-
-            {/* Expense Tile */}
-            <div
-              className={cn(
-                "group p-5 rounded-[2rem] border transition-all duration-300",
-                theme === "dark"
-                  ? "bg-black/20 border-white/5 hover:bg-white/5"
-                  : "bg-white/50 border-slate-200/60 hover:bg-white"
-              )}
-            >
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-full bg-rose-500/10 border border-rose-500/20">
-                    <ArrowUp className="w-3.5 h-3.5 text-rose-500" />
-                  </div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-rose-500/80">
-                    Expense
-                  </span>
-                </div>
-                <p className="font-bold text-2xl tracking-tight tabular-nums">
-                  {activeTab === TABS.WEALTH
-                    ? formatIndianCompact(netWorth.liabilities)
-                    : `₹${totals.expenses.toLocaleString("en-IN")}`}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    )}
-  </header>
-)}
-{/* // --- Header Ends --- */}
+        {/* // --- Header Ends --- */}
 
         <main
           className={cn(
             "pb-24",
             [TABS.PROFILE, TABS.HISTORY, TABS.AUDIT, TABS.ITR].includes(
-              activeTab
+              activeTab,
             )
               ? "pt-20"
-              : "pt-8"
+              : "pt-8",
           )}
         >
           <AnimatePresence mode="wait">
@@ -574,12 +586,36 @@ export default function App() {
             </motion.div>
           </AnimatePresence>
 
-          <footer className="mt-28 flex flex-col items-center opacity-30">
-            <div className="h-[1px] w-12 bg-blue-500 mb-6" />
-            <div className="text-[10px] font-mono tracking-[0.5em] uppercase">
-              {APP_VERSION}
+          {/* Footer Start */}
+          <footer className="mt-32 pb-10 flex flex-col items-center justify-center gap-4 opacity-60 hover:opacity-100 transition-opacity duration-500">
+            {/* Gradient Separator Line */}
+            <div className="h-px w-48 bg-gradient-to-r from-transparent via-blue-500 to-transparent mb-2" />
+
+            <div className="flex flex-col items-center gap-2 text-center">
+              {/* Brand & Copyright - Increased to text-sm (14px) */}
+              <p
+                className={cn(
+                  "text-sm font-medium tracking-wide",
+                  theme === "dark" ? "text-slate-400" : "text-slate-600",
+                )}
+              >
+                &copy; {new Date().getFullYear()} Spendsy. All rights reserved.
+              </p>
+
+              {/* Version Badge - Increased to text-xs (12px) */}
+              <div
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-xs font-mono tracking-widest uppercase border mt-2",
+                  theme === "dark"
+                    ? "bg-white/5 border-white/10 text-slate-500"
+                    : "bg-slate-100 border-slate-200 text-slate-500",
+                )}
+              >
+                {APP_VERSION}
+              </div>
             </div>
           </footer>
+          {/* Footer End */}
         </main>
       </div>
     </div>
