@@ -8,13 +8,13 @@ export const Navigation = ({ activeTab, setActiveTab, onSignOut }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const navItems = [
-    { id: TABS.HOME, icon: Home, label: "Home" }, // Section 1
-    { id: TABS.HISTORY, icon: ListFilter, label: "History" }, // Section 2
-    { id: TABS.ADD, icon: Plus, label: "Add New" }, // Section 3
-    { id: TABS.AUDIT, icon: ClipboardCheck, label: "Tax Audit" }, // Section 4
-    { id: TABS.STATS, icon: PieChart, label: "Stats" }, // Section 5
-    { id: TABS.WEALTH, icon: Landmark, label: "Wealth" }, // Section 6
-    { id: TABS.PROFILE, icon: User, label: "Profile" } // Section 7
+    { id: TABS.HOME, icon: Home, label: "Home" },
+    { id: TABS.HISTORY, icon: ListFilter, label: "History" },
+    { id: TABS.ADD, icon: Plus, label: "Add New" },
+    { id: TABS.AUDIT, icon: ClipboardCheck, label: "Tax Audit" },
+    { id: TABS.STATS, icon: PieChart, label: "Stats" },
+    { id: TABS.WEALTH, icon: Landmark, label: "Wealth" },
+    { id: TABS.PROFILE, icon: User, label: "Profile" }
   ];
 
   return (
@@ -22,83 +22,93 @@ export const Navigation = ({ activeTab, setActiveTab, onSignOut }) => {
       {/* =======================
           DESKTOP SIDEBAR 
       ======================== */}
-      <nav className="hidden md:flex flex-col fixed left-4 top-4 bottom-4 w-24 bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-[2rem] items-center py-6 z-50 shadow-2xl shadow-black/50 print:hidden">
+      <nav className="hidden md:flex flex-col fixed left-4 top-4 bottom-4 w-20 hover:w-64 xl:w-24 xl:hover:w-64 bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-[2rem] items-center py-4 xl:py-6 z-50 shadow-2xl shadow-black/50 print:hidden transition-all duration-500 ease-in-out group overflow-hidden">
         
-        {/* --- GROUP 1: Logo & Nav Items (Anchored Top) --- */}
-        <div className="flex flex-col items-center w-full gap-8 overflow-y-auto no-scrollbar">
+        {/* --- SECTION 1: TOP CONTENT (Logo + Nav Items) --- */}
+        <div className="flex flex-col w-full gap-4 xl:gap-6 flex-1 min-h-0">
           
-          {/* Logo */}
-          <div className="shrink-0 mt-2">
-            <div className="w-14 h-14 bg-gradient-to-tr from-blue-600 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg">
-              <Wallet className="w-7 h-7 text-white" />
-            </div>
+          {/* 1.1 LOGO SECTION (Sized exactly like Nav Items) */}
+          <div className="shrink-0 mt-1 w-full px-2 xl:px-4">
+             <div className="flex items-center p-2 xl:p-3 rounded-xl xl:rounded-2xl transition-all duration-300 shrink-0 overflow-hidden">
+               
+               {/* Icon Container - Matching Nav Item Size (w-6/w-8) */}
+               <div className="w-6 h-6 xl:w-8 xl:h-8 bg-gradient-to-tr from-blue-600 to-cyan-500 rounded-lg xl:rounded-xl flex items-center justify-center shadow-lg shrink-0 mx-auto group-hover:mx-0 transition-all duration-500">
+                  {/* Icon size adjusted to fit inside the smaller box */}
+                  <Wallet className="w-3.5 h-3.5 xl:w-4.5 xl:h-4.5 text-white" />
+               </div>
+
+               {/* App Name */}
+               <div className="opacity-0 w-0 group-hover:w-auto group-hover:opacity-100 group-hover:ml-3 transition-all duration-500 delay-75 whitespace-nowrap">
+                  <h1 className="text-lg xl:text-xl font-black tracking-tight text-white">
+                    Spendsy
+                  </h1>
+               </div>
+
+             </div>
           </div>
 
-          {/* Navigation Items List */}
-          <div className="flex flex-col gap-3 w-full px-4 pb-4">
+          {/* 1.2 Navigation Items */}
+          <div className="flex flex-col gap-1 xl:gap-3 w-full px-2 xl:px-4 pb-2 overflow-y-auto no-scrollbar">
             {navItems.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`group relative p-3 xl:p-4 rounded-2xl transition-all shrink-0 ${
+                className={`group/btn relative flex items-center p-2 xl:p-3 rounded-xl xl:rounded-2xl transition-all duration-300 shrink-0 overflow-hidden ${
                   activeTab === tab.id
                     ? "bg-white/10 text-cyan-400"
-                    : "text-slate-400 hover:text-slate-200"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
                 }`}
               >
-                <tab.icon className="w-6 h-6 mx-auto" />
+                {/* Icon Wrapper - w-6/w-8 (Same as Logo Container) */}
+                <div className="w-6 h-6 xl:w-8 xl:h-8 flex items-center justify-center shrink-0 mx-auto group-hover:mx-0 transition-all duration-500">
+                  <tab.icon className="w-5 h-5 xl:w-6 xl:h-6" />
+                </div>
                 
-                {/* Tooltip */}
-                <span className="absolute left-16 top-1/2 -translate-y-1/2 ml-4 px-3 py-1.5 
-                                 bg-slate-900 text-white text-xs font-semibold rounded-lg border border-white/10 
-                                 opacity-0 group-hover:opacity-100 transition-opacity duration-300 
-                                 pointer-events-none whitespace-nowrap shadow-xl z-50">
+                {/* Text Label */}
+                <span className="text-xs xl:text-sm font-semibold tracking-wide whitespace-nowrap opacity-0 w-0 group-hover:w-auto group-hover:opacity-100 group-hover:ml-3 transition-all duration-500 delay-75">
                   {tab.label}
                 </span>
+
+                {/* Active Indicator */}
+                {activeTab === tab.id && (
+                  <div className="absolute right-3 xl:right-4 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-[0_0_10px_cyan] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                )}
               </button>
             ))}
           </div>
         </div>
 
-        {/* --- GROUP 2: Logout (Anchored Bottom) --- */}
-        <div className="mt-auto shrink-0">
+        {/* --- SECTION 2: BOTTOM CONTENT (Logout) --- */}
+        <div className="shrink-0 w-full px-2 xl:px-4 mt-2">
           <button 
             onClick={onSignOut} 
-            className="group relative p-4 text-slate-500 hover:text-rose-400 transition-colors"
+            className="flex items-center w-full p-2 xl:p-4 rounded-xl xl:rounded-2xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-300 group/logout overflow-hidden"
           >
-            <LogOut className="w-6 h-6" />
-            
-            {/* Logout Tooltip */}
-            <span className="absolute left-16 top-1/2 -translate-y-1/2 ml-4 px-3 py-1.5 
-                             bg-slate-900 text-rose-400 text-xs font-semibold rounded-lg border border-white/10 
-                             opacity-0 group-hover:opacity-100 transition-opacity duration-300 
-                             pointer-events-none whitespace-nowrap shadow-xl z-50">
+            <div className="w-6 h-6 xl:w-8 xl:h-8 flex items-center justify-center shrink-0 mx-auto group-hover:mx-0 transition-all duration-500">
+              <LogOut className="w-5 h-5 xl:w-6 xl:h-6" />
+            </div>
+            <span className="text-xs xl:text-sm font-bold tracking-wide whitespace-nowrap opacity-0 w-0 group-hover:w-auto group-hover:opacity-100 group-hover:ml-3 transition-all duration-500 delay-75">
               Sign Out
             </span>
           </button>
         </div>
+
       </nav>
 
       {/* =======================
-          MOBILE NAVIGATION 
+          MOBILE NAVIGATION (Unchanged)
       ======================== */}
       <div className="md:hidden print:hidden">
-        
-        {/* 1. Backdrop Blur (Appears when menu opens) */}
         {isMobileMenuOpen && (
           <div 
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300"
             onClick={() => setIsMobileMenuOpen(false)}
           />
         )}
-
-        {/* 2. The Pop-up Menu Container */}
         <div className={`fixed bottom-6 left-6 right-6 z-50 transition-all duration-300 transform ${
           isMobileMenuOpen ? 'translate-y-0 opacity-100' : 'translate-y-[120%] opacity-0 pointer-events-none'
         }`}>
           <div className="bg-[#0f0c29]/95 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/50 rounded-[2rem] p-6">
-            
-            {/* Grid of Icons */}
             <div className="grid grid-cols-4 gap-4 mb-4">
               {navItems.map((t) => (
                 <button 
@@ -120,8 +130,6 @@ export const Navigation = ({ activeTab, setActiveTab, onSignOut }) => {
                 </button>
               ))}
             </div>
-
-            {/* Logout Button (Full Width in Menu) */}
             <button 
               onClick={onSignOut}
               className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20"
@@ -131,8 +139,6 @@ export const Navigation = ({ activeTab, setActiveTab, onSignOut }) => {
             </button>
           </div>
         </div>
-
-        {/* 3. The Toggle Button (Always Visible) */}
         <div className="fixed bottom-6 right-6 z-50">
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -145,8 +151,6 @@ export const Navigation = ({ activeTab, setActiveTab, onSignOut }) => {
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
-
-        {/* 4. Active Tab Indicator (Mini - Bottom Left) */}
         {!isMobileMenuOpen && (
            <div className="fixed bottom-6 left-6 z-40 bg-[#0f0c29]/90 backdrop-blur-xl border border-white/10 rounded-full py-2 px-4 flex items-center gap-3 shadow-lg">
              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -155,7 +159,6 @@ export const Navigation = ({ activeTab, setActiveTab, onSignOut }) => {
              </span>
            </div>
         )}
-
       </div>
     </>
   );
