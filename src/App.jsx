@@ -528,6 +528,7 @@ export default function App() {
               {activeTab === TABS.HOME && (
                 <HomePage
                   transactions={transactions}
+                  wealthItems={wealthItems}  // <--- ADD THIS LINE HERE
                   setActiveTab={setActiveTab}
                   onDelete={requestDeleteTransaction}
                   onUpdate={updateTransaction}

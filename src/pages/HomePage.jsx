@@ -3,15 +3,12 @@ import React, { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   CreditCard,
-  AlertCircle,
-  CheckCircle2,
+  Zap,
   FileText,
   PieChart,
   Coins,
   History,
   Scale,
-  ArrowUpRight,
-  Zap,
   ArrowRightLeft,
 } from "lucide-react";
 import TransactionItem from "../components/domain/TransactionItem";
@@ -21,18 +18,26 @@ import { cn } from "../utils/cn";
 
 const HomePage = ({
   transactions,
-  wealthItems = [],
+  wealthItems = [], // If this is empty, Net Worth will be 0
   setActiveTab,
   onDelete,
   settings,
   theme = "dark",
 }) => {
-  // --- Logic Preserved ---
+  // Debugging: Check your console to see if data is actually arriving
+  // If this logs "HomePage wealthItems: []", then the parent is not passing data.
+  // console.log("HomePage wealthItems:", wealthItems);
+
   const metrics = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
+    // Fiscal Year Logic
+    const fyStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
+    const fyStartDate = new Date(fyStartYear, 3, 1);
+
+    // Monthly Expense Calculation
     const monthlyData = transactions.filter((t) => {
       const d = normalizeDate(t.date);
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
@@ -42,13 +47,22 @@ const HomePage = ({
       .filter((t) => t.type === "expense")
       .reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
 
+    // --- NET WORTH CALCULATION (Matches Wealth Page Logic) ---
     const netWorth = wealthItems.reduce((acc, curr) => {
-      const amt = parseFloat(curr.amount || 0);
-      return curr.type === "asset" ? acc + amt : acc - amt;
+      // Handle both 'amount' and 'value' keys to ensure we catch everything
+      const amt = parseFloat(curr.amount || curr.value || 0);
+
+      if (curr.type === "asset") return acc + amt;
+      if (curr.type === "liability") return acc - amt;
+      return acc;
     }, 0);
 
+    // Taxable Income Calculation (Current FY Only)
     const totalTaxable = transactions
-      .filter((t) => t.type === "income")
+      .filter((t) => {
+        const d = normalizeDate(t.date);
+        return t.type === "income" && d >= fyStartDate;
+      })
       .reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
 
     const estimatedTax = totalTaxable > 700000 ? totalTaxable * 0.15 : 0;
@@ -66,13 +80,7 @@ const HomePage = ({
   const percentage =
     budget > 0 ? Math.min(100, (metrics.expense / budget) * 100) : 0;
 
-  // --- FAST & BOUNCY CONFIG ---
-  const bouncySpring = {
-    type: "spring",
-    stiffness: 500,
-    damping: 20,
-    mass: 1,
-  };
+  const bouncySpring = { type: "spring", stiffness: 500, damping: 20, mass: 1 };
 
   const MetricTile = ({
     title,
@@ -83,21 +91,18 @@ const HomePage = ({
     isSpecial = false,
   }) => (
     <div className="relative group">
-      {/* OUTER ICON-COLOR GLOW */}
       <div
         className={cn(
           "pointer-events-none absolute -inset-3 rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl",
           isSpecial
             ? "bg-blue-500/40"
             : colorClass?.includes("blue")
-            ? "bg-blue-500/30"
-            : colorClass?.includes("emerald")
-            ? "bg-emerald-500/30"
-            : colorClass?.includes("purple")
-            ? "bg-purple-500/30"
-            : colorClass?.includes("amber")
-            ? "bg-amber-500/30"
-            : "bg-white/20"
+              ? "bg-blue-500/30"
+              : colorClass?.includes("emerald")
+                ? "bg-emerald-500/30"
+                : colorClass?.includes("purple")
+                  ? "bg-purple-500/30"
+                  : "bg-white/20",
         )}
       />
 
@@ -111,19 +116,18 @@ const HomePage = ({
           isSpecial
             ? "bg-blue-600 border-blue-400 shadow-blue-500/40"
             : theme === "dark"
-            ? "bg-white/10 border-white/10 backdrop-blur-md shadow-2xl"
-            : "bg-white border-white shadow-xl shadow-blue-500/10"
+              ? "bg-white/10 border-white/10 backdrop-blur-md shadow-2xl"
+              : "bg-white border-white shadow-xl shadow-blue-500/10",
         )}
       >
         <div
           className={cn(
             "mb-4 p-3 rounded-2xl inline-flex",
-            isSpecial ? "bg-white/20 text-white" : colorClass
+            isSpecial ? "bg-white/20 text-white" : colorClass,
           )}
         >
           <Icon className="w-5 h-5" />
         </div>
-
         <div>
           <p
             className={cn(
@@ -131,8 +135,8 @@ const HomePage = ({
               isSpecial
                 ? "text-blue-100"
                 : theme === "dark"
-                ? "text-blue-400/60"
-                : "text-blue-600"
+                  ? "text-blue-400/60"
+                  : "text-blue-600",
             )}
           >
             {title}
@@ -143,8 +147,8 @@ const HomePage = ({
               isSpecial
                 ? "text-white"
                 : theme === "dark"
-                ? "text-white"
-                : "text-indigo-950"
+                  ? "text-white"
+                  : "text-indigo-950",
             )}
           >
             {value}
@@ -159,7 +163,7 @@ const HomePage = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* LEFT COLUMN */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Main Monthly Spend Tracker */}
+          {/* Monthly Spend */}
           <motion.div
             whileHover={{ y: -5 }}
             transition={bouncySpring}
@@ -167,7 +171,7 @@ const HomePage = ({
               "relative overflow-hidden p-8 rounded-[3.5rem] border shadow-2xl",
               theme === "dark"
                 ? "bg-white/[0.03] border-white/10 backdrop-blur-3xl"
-                : "bg-white border-white"
+                : "bg-white border-white",
             )}
           >
             <div className="flex justify-between items-start mb-8">
@@ -181,13 +185,13 @@ const HomePage = ({
                 <h3
                   className={cn(
                     "text-5xl font-black tracking-tighter",
-                    theme === "dark" ? "text-white" : "text-indigo-950"
+                    theme === "dark" ? "text-white" : "text-indigo-950",
                   )}
                 >
                   ₹{metrics.expense.toLocaleString("en-IN")}
                 </h3>
                 <p className="text-xs font-bold opacity-40 mt-1">
-                  Monthly Budget: ₹{formatIndianCompact(budget)}
+                  Monthly Budget: {formatIndianCompact(budget)}
                 </p>
               </div>
               <div
@@ -195,13 +199,12 @@ const HomePage = ({
                   "px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border",
                   percentage >= 100
                     ? "bg-rose-500/10 border-rose-500/20 text-rose-500"
-                    : "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+                    : "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
                 )}
               >
                 {percentage >= 100 ? "Limit Reached" : "On Track"}
               </div>
             </div>
-
             <div className="relative h-4 w-full bg-blue-500/5 rounded-full p-1">
               <motion.div
                 initial={{ width: 0 }}
@@ -209,7 +212,7 @@ const HomePage = ({
                 transition={{ duration: 1.5, ease: "circOut" }}
                 className={cn(
                   "h-full rounded-full shadow-lg",
-                  percentage >= 100 ? "bg-rose-500" : "bg-blue-600"
+                  percentage >= 100 ? "bg-rose-500" : "bg-blue-600",
                 )}
               />
             </div>
@@ -220,25 +223,27 @@ const HomePage = ({
             title="Income Tax Return"
             value={
               metrics.estimatedTax > 0
-                ? `₹${formatIndianCompact(metrics.estimatedTax)} Tax`
-                : "File ITR Now"
+                ? `${formatIndianCompact(metrics.estimatedTax)}`
+                : "File Now"
             }
             icon={Scale}
+            colorClass="bg-rose-500/10 text-rose-500"
             tab={TABS.ITR}
-            isSpecial
           />
 
           {/* Bottom Grid */}
           <div className="grid grid-cols-2 gap-4">
             <MetricTile
               title="Taxable"
+              // Corrected: formatIndianCompact adds symbol, so we don't add "₹"
               value={formatIndianCompact(metrics.totalTaxable)}
               icon={FileText}
               colorClass="bg-blue-500/10 text-blue-500"
-              tab={TABS.WEALTH}
+              tab={TABS.AUDIT}
             />
             <MetricTile
               title="Net Worth"
+              // Corrected: formatIndianCompact adds symbol, so we don't add "₹"
               value={formatIndianCompact(metrics.netWorth)}
               icon={Coins}
               colorClass="bg-emerald-500/10 text-emerald-500"
@@ -267,10 +272,10 @@ const HomePage = ({
             <h3
               className={cn(
                 "font-black text-2xl tracking-tighter",
-                theme === "dark" ? "text-white" : "text-indigo-950"
+                theme === "dark" ? "text-white" : "text-indigo-950",
               )}
             >
-              Recent Journal
+              Recent History
             </h3>
             <motion.button
               whileHover={{ x: 5, color: "#030303" }}
@@ -281,13 +286,12 @@ const HomePage = ({
               Full History <ArrowRightLeft className="w-4 h-4" />
             </motion.button>
           </div>
-
           <motion.div
             className={cn(
               "p-6 rounded-[3.5rem] border shadow-2xl transition-all",
               theme === "dark"
                 ? "bg-white/[0.02] border-white/5 backdrop-blur-md"
-                : "bg-white/80 border-white/50 backdrop-blur-xl"
+                : "bg-white/80 border-white/50 backdrop-blur-xl",
             )}
           >
             {transactions.length === 0 ? (
