@@ -236,7 +236,7 @@ const HomePage = ({
             <MetricTile
               title="Taxable"
               // Corrected: formatIndianCompact adds symbol, so we don't add "₹"
-              value={formatIndianCompact(metrics.totalTaxable)}
+              value={formatIndianCompact(metrics.estimatedTax)}
               icon={FileText}
               colorClass="bg-blue-500/10 text-blue-500"
               tab={TABS.AUDIT}

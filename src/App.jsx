@@ -509,11 +509,11 @@ export default function App() {
 
         <main
           className={cn(
-            "pb-24",
+            "pb-4",
             [TABS.PROFILE, TABS.HISTORY, TABS.AUDIT, TABS.ITR].includes(
               activeTab,
             )
-              ? "pt-20"
+              ? "pt-5"
               : "pt-8",
           )}
         >
