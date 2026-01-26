@@ -587,7 +587,7 @@ export default function App() {
           </AnimatePresence>
 
           {/* Footer Start */}
-          <footer className="mt-32 pb-10 flex flex-col items-center justify-center gap-4 opacity-60 hover:opacity-100 transition-opacity duration-500">
+          <footer className="mt-32 pb-1 flex flex-col items-center justify-center gap-4 opacity-60 hover:opacity-100 transition-opacity duration-500">
             {/* Gradient Separator Line */}
             <div className="h-px w-48 bg-gradient-to-r from-transparent via-blue-500 to-transparent mb-2" />
 
