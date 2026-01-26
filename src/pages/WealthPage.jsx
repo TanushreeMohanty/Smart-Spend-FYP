@@ -76,7 +76,7 @@ const WealthPage = ({ wealthItems, user, appId, showToast, triggerConfirm }) => 
                     <div>
                         <p className="text-xs text-emerald-200 font-bold uppercase tracking-wider mb-1">Total Net Worth</p>
                         {/* FIXED CURRENCY SYMBOL */}
-                        <h3 className="text-3xl font-bold text-white">₹{formatIndianCompact(netWorth)}</h3>
+                        <h3 className="text-3xl font-bold text-white">{formatIndianCompact(netWorth)}</h3>
                     </div>
                     <div className="text-right">
                         <p className="text-[10px] text-emerald-200/60 font-bold">vs last month</p>

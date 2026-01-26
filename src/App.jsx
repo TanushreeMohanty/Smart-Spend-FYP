@@ -26,7 +26,7 @@ import { Toast, Loading, ConfirmationDialog } from "./components/ui/Shared";
 import WelcomeWizard from "./components/onboarding/WelcomeWizard";
 
 // Pages
-import LoginScreen from "./pages/LoginScreen"; // Login Screen
+import LoginScreen from "./pages/LoginScreen"; // Login Screen (UPDATED)
 import HomePage from "./pages/HomePage"; // Section 1
 import HistoryPage from "./pages/HistoryPage"; // Section 2
 import AddPage from "./pages/AddPage"; // Section 3
@@ -395,7 +395,7 @@ export default function App() {
                     )}
                   >
                     <div className="flex items-center text-emerald-500 text-[10px] mb-2 font-black uppercase tracking-widest">
-                      <ArrowDown className="w-3.5 h-3.5 mr-1" /> Inflow
+                      <ArrowDown className="w-3.5 h-3.5 mr-1" /> Income
                     </div>
                     <p className="font-bold text-2xl tracking-tight">
                       {activeTab === TABS.WEALTH
@@ -412,7 +412,7 @@ export default function App() {
                     )}
                   >
                     <div className="flex items-center text-rose-500 text-[10px] mb-2 font-black uppercase tracking-widest">
-                      <ArrowUp className="w-3.5 h-3.5 mr-1" /> Outflow
+                      <ArrowUp className="w-3.5 h-3.5 mr-1" /> Expense
                     </div>
                     <p className="font-bold text-2xl tracking-tight">
                       {activeTab === TABS.WEALTH
