@@ -104,7 +104,7 @@ const HistoryPage = ({ transactions, onDelete, onBulkDelete, setActiveTab, onUpd
     const visible = filtered.slice(0, page * PER_PAGE);
 
     return (
-        <div className="space-y-6 pb-24 animate-in fade-in">
+        <div className="space-y-6 pb-4 animate-in fade-in">
             {/* --- Header --- */}
             <div className="flex justify-between items-center mb-2">
                 <h2 className="text-2xl font-bold text-white">All Transactions</h2>

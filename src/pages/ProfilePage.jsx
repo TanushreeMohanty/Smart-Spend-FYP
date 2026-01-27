@@ -47,7 +47,7 @@ const ProfilePage = ({ user, settings, onUpdateSettings, onSignOut, triggerConfi
     const requestSignOut = () => triggerConfirm("Sign out now?", onSignOut);
 
     return (
-        <div className="space-y-6 pb-24 animate-in fade-in">
+        <div className="space-y-6 pb-4 animate-in fade-in">
             
             {/* User Header */}
             <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10 flex items-center space-x-5">
