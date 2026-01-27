@@ -278,6 +278,7 @@ const AuditPage = ({
 
   // --- 1. CORE CALCULATION LOGIC ---
   // Calls the TaxService to compute liability under Old vs New Regime
+  // --- 1. CORE CALCULATION LOGIC ---
   const data = useMemo(() => {
     const rawData = TaxService.calculate(
       transactions,
@@ -286,13 +287,43 @@ const AuditPage = ({
       settings,
     );
 
-    // Logic for Recommendation: Identify which regime is cheaper
-    const isNewCheaper = rawData.taxNew <= rawData.taxOld;
+    // --- APPLY YOUR SPECIFIC FY 2025-26 LOGIC ---
+    const calculateNewRegimeTax = (taxableValue) => {
+      let estimatedTax = 0;
+      // Rebate Logic: No tax if taxable income <= 12,00,000
+      if (taxableValue > 1200000) {
+        let taxBase = 0;
+        // New Slab Math
+        if (taxableValue > 400000)
+          taxBase += Math.min(taxableValue - 400000, 400000) * 0.05; // 4-8L (Max 20k)
+        if (taxableValue > 800000)
+          taxBase += Math.min(taxableValue - 800000, 400000) * 0.1; // 8-12L (Max 40k)
+        if (taxableValue > 1200000) taxBase += (taxableValue - 1200000) * 0.15; // 12L+ (15%)
+
+        estimatedTax = taxBase * 1.04; // Add 4% Cess
+      }
+      return estimatedTax;
+    };
+
+    const finalTaxNew = calculateNewRegimeTax(rawData.taxableNew);
+
+    // Identify which regime is actually better for the user
+    const isNewCheaper = finalTaxNew <= rawData.taxOld;
+
+    // Choose the taxable income based on the recommended regime
+    const recommendedTaxable = isNewCheaper
+      ? rawData.taxableNew
+      : rawData.taxableOld;
+    const recommendedTax = isNewCheaper ? rawData.taxNew : rawData.taxOld;
 
     return {
       ...rawData,
+      taxNew: finalTaxNew, // Override with corrected logic
       isNewCheaper,
-      recommendedTax: Math.min(rawData.taxNew, rawData.taxOld),
+      recommendedTaxable: isNewCheaper
+        ? rawData.taxableNew
+        : rawData.taxableOld,
+      recommendedTax: isNewCheaper ? finalTaxNew : rawData.taxOld,
     };
   }, [transactions, taxProfile, wealthItems, settings]);
 
@@ -464,7 +495,7 @@ const AuditPage = ({
               <p className="text-xs text-blue-200">
                 Your estimated tax is{" "}
                 <span className="font-bold text-white">
-                  ₹{Math.min(data.taxNew, data.taxOld).toLocaleString()}
+                  ₹{data.recommendedTax.toLocaleString()}
                 </span>
                 . File your self-declaration now.
               </p>
@@ -487,7 +518,7 @@ const AuditPage = ({
               Taxable Income
             </p>
             <h3 className="text-2xl font-bold text-white print:text-black">
-              ₹{data.taxableNew.toLocaleString()}
+              ₹{data.recommendedTaxable.toLocaleString()}{" "}
             </h3>
             <p className="text-[10px] text-indigo-300 mt-1 print:text-gray-500">
               FY {data.fiscalYear}
@@ -503,8 +534,7 @@ const AuditPage = ({
               {data.taxNew < data.taxOld ? "NEW REGIME" : "OLD REGIME"}
             </div>
             <p className="text-[10px] text-slate-400 mt-1 print:text-gray-500">
-              Est. Liability: ₹
-              {Math.min(data.taxNew, data.taxOld).toLocaleString()}
+              Est. Liability: ₹{data.recommendedTax.toLocaleString()}
             </p>
             {/* Optional: Add a "Tax Free" badge for income <= 12.75L in New Regime */}
             {data.taxNew === 0 &&

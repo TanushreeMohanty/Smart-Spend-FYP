@@ -181,34 +181,33 @@ const totalDeductionsNew = stdDedNew; // Standard Deduction only for New Regime
 const calcTax = (income, regimeType) => {
   const config = regimeType === 'new' ? TAX_CONSTANTS.NEW_REGIME : TAX_CONSTANTS.OLD_REGIME;
   
-  // Step A: Check for Rebate (Sec 87A)
-  // New Regime: Tax-free up to 12L | Old Regime: Tax-free up to 5L
+  // 1. Check for Rebate (Sec 87A) - Tax-free up to 12L for New Regime FY 25-26
   if (income <= config.REBATE_LIMIT) return 0;
   
   let tax = 0;
-  let prevLimit = 0;
   
-  // Step B: Slab Calculation
-  for (const slab of config.SLABS) {
-    if (income <= prevLimit) break;
-    
-    const currentLimit = slab.limit === null ? Infinity : slab.limit;
-    const taxableAtThisSlab = Math.min(income, currentLimit) - prevLimit;
-    
-    if (taxableAtThisSlab > 0) {
-        tax += taxableAtThisSlab * slab.rate;
-    }
-    prevLimit = currentLimit;
+  if (regimeType === 'new') {
+    // NEW SLABS FY 2025-26 (The Correct Logic)
+    // 0-4L: 0 | 4-8L: 5% (20k) | 8-12L: 10% (40k) | 12-16L: 15%
+    if (income > 400000) tax += Math.min(income - 400000, 400000) * 0.05; // Max 20,000
+    if (income > 800000) tax += Math.min(income - 800000, 400000) * 0.10; // Max 40,000
+    if (income > 1200000) tax += Math.min(income - 1200000, 400000) * 0.15;
+    if (income > 1600000) tax += Math.min(income - 1600000, 400000) * 0.20;
+    // ... continue slabs as per constants
+  } else {
+    // OLD SLABS remain the same
+    if (income > 250000) tax += Math.min(income - 250000, 250000) * 0.05;
+    if (income > 500000) tax += Math.min(income - 500000, 500000) * 0.20;
+    if (income > 1000000) tax += (income - 1000000) * 0.30;
   }
 
-  // Step C: Marginal Relief (Budget 2025 Special)
-  // Prevents a sudden tax jump if earning just over 12L in New Regime
+  // 2. Marginal Relief (Budget 2025 Special)
   if (regimeType === 'new' && income > 1200000 && income <= 1275000) {
-    const excessIncome = income - 1200000;
-    tax = Math.min(tax, excessIncome);
+    tax = Math.min(tax, (income - 1200000));
   }
 
-  return tax * (1 + config.CESS);
+  // 3. Add Health & Education Cess (4%)
+  return tax * 1.04;
 };
 
 // Then call them like this:

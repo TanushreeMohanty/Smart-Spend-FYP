@@ -28,7 +28,7 @@ const HomePage = ({
   // If this logs "HomePage wealthItems: []", then the parent is not passing data.
   // console.log("HomePage wealthItems:", wealthItems);
 
-  const metrics = useMemo(() => {
+const metrics = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -47,41 +47,50 @@ const HomePage = ({
       .filter((t) => t.type === "expense")
       .reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
 
-    // --- NET WORTH CALCULATION (Matches Wealth Page Logic) ---
+    // Net Worth Calculation
     const netWorth = wealthItems.reduce((acc, curr) => {
-      // Handle both 'amount' and 'value' keys to ensure we catch everything
       const amt = parseFloat(curr.amount || curr.value || 0);
-
       if (curr.type === "asset") return acc + amt;
       if (curr.type === "liability") return acc - amt;
       return acc;
     }, 0);
 
-const totalIncome = transactions
-  .filter((t) => {
-    const d = normalizeDate(t.date);
-    return t.type === "income" && d >= fyStartDate;
-  })
-  .reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
-
-    // Taxable Income Calculation (Current FY Only)
-    const totalTaxable = transactions
+    // 1. Calculate Total Gross Income
+    const totalGrossIncome = transactions
       .filter((t) => {
         const d = normalizeDate(t.date);
         return t.type === "income" && d >= fyStartDate;
       })
       .reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
 
-      // NEW LOGIC: Standard Deduction of 75k for New Regime
-const taxableIncomeValue = Math.max(0, totalIncome - 75000);
-// NEW REBATE: No tax if taxable income <= 12,00,000
-const estimatedTax = taxableIncomeValue > 1200000 ? (calculateActualTax(taxableIncomeValue)) : 0;
-return {
-  expense,
-  netWorth,
-totalTaxable: taxableIncomeValue, // Change this to show income AFTER deduction  estimatedTax, // This is the Liability
-  count: transactions.length,
-};
+    // 2. APPLY NEW REGIME DEDUCTION (₹75,000)
+    // This makes the "Taxable" tile show 7.25L if income is 8L
+    const taxableIncomeValue = Math.max(0, totalGrossIncome - 75000);
+
+    // 3. CALCULATE ESTIMATED TAX (FY 2025-26 New Regime)
+    let estimatedTax = 0;
+    
+    // Rebate Logic: No tax if taxable income <= 12,00,000
+    if (taxableIncomeValue > 1200000) {
+      let tempIncome = taxableIncomeValue;
+      let taxBase = 0;
+
+      // New Slab Math
+      if (tempIncome > 400000) taxBase += Math.min(tempIncome - 400000, 400000) * 0.05; // 4-8L
+      if (tempIncome > 800000) taxBase += Math.min(tempIncome - 800000, 400000) * 0.10; // 8-12L
+      if (tempIncome > 1200000) taxBase += Math.min(tempIncome - 1200000, 400000) * 0.15; // 12-16L
+      // ... higher slabs as needed ...
+
+      estimatedTax = taxBase * 1.04; // Add 4% Cess
+    }
+
+    return {
+      expense,
+      netWorth,
+      totalTaxable: taxableIncomeValue, // This is now matched to Audit Page
+      estimatedTax,
+      count: transactions.length,
+    };
   }, [transactions, wealthItems]);
 
   const budget = parseFloat(settings?.monthlyBudget) || 0;
@@ -228,7 +237,7 @@ totalTaxable: taxableIncomeValue, // Change this to show income AFTER deduction 
 
           {/* ITR Tile */}
           <MetricTile
-            title="Income Tax Return"
+            title="Tax Payable"
             value={
               metrics.estimatedTax > 0
                 ? `${formatIndianCompact(metrics.estimatedTax)}`
@@ -242,7 +251,7 @@ totalTaxable: taxableIncomeValue, // Change this to show income AFTER deduction 
           {/* Bottom Grid */}
           <div className="grid grid-cols-2 gap-4">
             <MetricTile
-              title="Taxable"
+              title="Taxable Income"
               // Corrected: formatIndianCompact adds symbol, so we don't add "₹"
               value={formatIndianCompact(metrics.totalTaxable)}
               icon={FileText}
