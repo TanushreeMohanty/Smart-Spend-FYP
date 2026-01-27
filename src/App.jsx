@@ -304,7 +304,7 @@ export default function App() {
         )}
       >
         {/* // --- Header Starts --- */}
-        {![TABS.PROFILE, TABS.ITR].includes(activeTab) && (
+        {![TABS.PROFILE].includes(activeTab) && (
           <header
             className={cn(
               "z-40 pt-10 pb-2 transition-all duration-500",
@@ -324,6 +324,7 @@ export default function App() {
                 TABS.AUDIT,
                 TABS.STATS,
                 TABS.WEALTH,
+                TABS.ITR,
               ].includes(activeTab) ? (
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2 mb-2">
