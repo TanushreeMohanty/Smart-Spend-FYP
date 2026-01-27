@@ -84,5 +84,5 @@ export const categorizeTransaction = (desc) => {
         if (c.keywords && c.keywords.some(k => d.includes(k))) return c.id; 
     }
 
-    return 'others';
+    return 'other';
 };

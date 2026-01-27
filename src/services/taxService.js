@@ -141,36 +141,33 @@ export const TaxService = {
     // HEAD 2: BUSINESS
     // Logic: Section 44ADA (Presumptive) assumes 50% of receipts is profit for freelancers.
     let taxableBusinessIncome = businessIncome;
-    if (profile.isBusiness && businessIncome <= TAX_CONSTANTS.LIMITS.PRESUMPTIVE_TURNOVER_LIMIT) {
-      taxableBusinessIncome = businessIncome * TAX_CONSTANTS.LIMITS.PRESUMPTIVE_44ADA; 
-    }
+// Section 44ADA limit is 3Cr for FY 2025-26
+if (profile.isBusiness && businessIncome <= 30000000) {
+  taxableBusinessIncome = businessIncome * 0.50; 
+}
 
     // HEAD 3: SALARY (Standard Deduction)
-    // Rule: New Regime also allows ₹75k Standard Deduction (FY 24-25).
-    const stdDed = (salaryIncome > 0) ? TAX_CONSTANTS.LIMITS.STANDARD_DEDUCTION : 0;
+ // --- BUDGET 2025 UPDATE: Standard Deduction is now DIFFERENT for both regimes ---
+const stdDedOld = (salaryIncome > 0) ? 50000 : 0;
+const stdDedNew = (salaryIncome > 0) ? 75000 : 0; // Ensure this is 75000
 
     // TOTAL GTI
-    const grossTotalIncome = salaryIncome + incomeFromHP + taxableBusinessIncome + otherSourcesIncome; 
-
+const grossTotalIncome = salaryIncome + incomeFromHP + taxableBusinessIncome + otherSourcesIncome;
     // =====================================================
     // 7. DEDUCTIONS (CHAPTER VI-A)
     // =====================================================
     // We apply the legal limits (e.g., 80C is capped at 1.5L)
-    const used80C = Math.min(inv80C, TAX_CONSTANTS.LIMITS.SECTION_80C);
-    
-    // 80D: Self (25k) + Parents (50k Senior / 25k Normal)
-    const used80D = Math.min(inv80D_Self, TAX_CONSTANTS.LIMITS.SECTION_80D_SELF) + Math.min(inv80D_Parents, TAX_CONSTANTS.LIMITS.SECTION_80D_PARENTS);
-    
-    const usedNPS = Math.min(invNPS, TAX_CONSTANTS.LIMITS.SEC_80CCD_1B); // Extra 50k
-    const used80E = interest80E; // No limit on Education Loan interest
-    const used80TTA = Math.min(savingsInterest, TAX_CONSTANTS.LIMITS.SECTION_80TTA); // Savings interest up to 10k
+const used80C = Math.min(inv80C, 150000);
+const used80D = Math.min(inv80D_Self, 25000) + Math.min(inv80D_Parents, 50000);
+const usedNPS = Math.min(invNPS, 50000); 
+const used80TTA = Math.min(savingsInterest, 10000);
+const used80E = interest80E; // No limit on 80E
 
     // Total Deductions for Old Regime
-    const totalDeductionsOld = stdDed + used80C + used80D + usedNPS + used80E + used80TTA;
-    
+const totalDeductionsOld = stdDedOld + used80C + used80D + usedNPS + used80E + used80TTA;    
     // Total Deductions for New Regime (Only Standard Deduction allowed)
-    const totalDeductionsNew = stdDed; 
-    
+const totalDeductionsNew = stdDedNew; // Standard Deduction only for New Regime
+
     // =====================================================
     // 8. FINAL TAXABLE INCOME
     // =====================================================
@@ -181,32 +178,42 @@ export const TaxService = {
     // 9. ROBUST TAX CALCULATOR (SLAB ENGINE)
     // =====================================================
     // Generic function to apply any set of Tax Slabs (Old or New)
-    const calcTax = (income, regime) => {
-      // Step A: Check for Rebate (Sec 87A) - e.g., Income < 7L is tax-free in New Regime
-      if (income <= regime.REBATE_LIMIT) return 0;
-      
-      let tax = 0;
-      let prevLimit = 0;
-      
-      // Step B: Iterate through Slabs
-      for (const slab of regime.SLABS) {
-        if (income <= prevLimit) break;
-        
-        // Handle 'Infinity' for the highest slab (e.g., Above 15L)
-        const currentLimit = slab.limit === null ? Infinity : slab.limit;
-        const taxableAtThisSlab = Math.min(income, currentLimit) - prevLimit;
-        
-        if (taxableAtThisSlab > 0) {
-            tax += taxableAtThisSlab * slab.rate;
-        }
-        prevLimit = currentLimit;
-      }
-      // Step C: Add Health & Education Cess (4%)
-      return tax * (1 + regime.CESS);
-    };
+const calcTax = (income, regimeType) => {
+  const config = regimeType === 'new' ? TAX_CONSTANTS.NEW_REGIME : TAX_CONSTANTS.OLD_REGIME;
+  
+  // Step A: Check for Rebate (Sec 87A)
+  // New Regime: Tax-free up to 12L | Old Regime: Tax-free up to 5L
+  if (income <= config.REBATE_LIMIT) return 0;
+  
+  let tax = 0;
+  let prevLimit = 0;
+  
+  // Step B: Slab Calculation
+  for (const slab of config.SLABS) {
+    if (income <= prevLimit) break;
+    
+    const currentLimit = slab.limit === null ? Infinity : slab.limit;
+    const taxableAtThisSlab = Math.min(income, currentLimit) - prevLimit;
+    
+    if (taxableAtThisSlab > 0) {
+        tax += taxableAtThisSlab * slab.rate;
+    }
+    prevLimit = currentLimit;
+  }
 
-    const taxOld = calcTax(taxableOld, TAX_CONSTANTS.OLD_REGIME);
-    const taxNew = calcTax(taxableNew, TAX_CONSTANTS.NEW_REGIME);
+  // Step C: Marginal Relief (Budget 2025 Special)
+  // Prevents a sudden tax jump if earning just over 12L in New Regime
+  if (regimeType === 'new' && income > 1200000 && income <= 1275000) {
+    const excessIncome = income - 1200000;
+    tax = Math.min(tax, excessIncome);
+  }
+
+  return tax * (1 + config.CESS);
+};
+
+// Then call them like this:
+const taxOld = calcTax(taxableOld, 'old');
+const taxNew = calcTax(taxableNew, 'new');
 
     // =====================================================
     // 10. GENERATE REPORT & INSIGHTS
@@ -223,6 +230,8 @@ export const TaxService = {
     const monthlyPace80C = inv80C / Math.max(1, monthsElapsed);
 
     return {
+      taxableOld, // This will be 750,000 (8L - 50k)
+    taxableNew, // This will be 925,000 (10L - 75k)
       fiscalYear: `${fyStartYear}-${fyStartYear+1}`,
       mode: 'PLANNING', 
       sources: { salary: salaryIncome, interest: savingsInterest, other: otherSourcesIncome, total: grossTotalIncome },
@@ -234,10 +243,10 @@ export const TaxService = {
         other: otherSourcesIncome
       },
       deductions: {
-        c80: { used: used80C, limit: TAX_CONSTANTS.LIMITS.SECTION_80C, pace: monthlyPace80C },
-        d80: { used: used80D, limit: TAX_CONSTANTS.LIMITS.SECTION_80D_SELF + TAX_CONSTANTS.LIMITS.SECTION_80D_PARENTS },
-        nps: { used: usedNPS, limit: TAX_CONSTANTS.LIMITS.SEC_80CCD_1B },
-        hln: { used: interest24b, potential: missingInterestClaim },
+      c80: { used: used80C, limit: 150000, pace: monthlyPace80C },
+d80: { used: used80D, limit: 75000 },
+nps: { used: usedNPS, limit: 50000 },
+hln: { used: interest24b, potential: missingInterestClaim },
         edu: { used: used80E, potential: false },
         tta: { used: used80TTA },
         hra: { potential: rentPaid, notComputed: hraNotComputed }
@@ -245,7 +254,7 @@ export const TaxService = {
       taxableOld, taxableNew, taxOld, taxNew,
       compliance: { incomeMismatch, totalBankCredits, missingRentIncome, missing80D, missingInterestClaim, capitalGainsUnverified },
       // Opportunity Loss: How much tax COULD have been saved?
-      missedSavings: (Math.max(0, TAX_CONSTANTS.LIMITS.SECTION_80C - used80C) + Math.max(0, 50000 - usedNPS)) * 0.3
+missedSavings: (Math.max(0, 150000 - used80C) + Math.max(0, 50000 - usedNPS)) * 0.3
     };
   }
 };

@@ -57,6 +57,13 @@ const HomePage = ({
       return acc;
     }, 0);
 
+const totalIncome = transactions
+  .filter((t) => {
+    const d = normalizeDate(t.date);
+    return t.type === "income" && d >= fyStartDate;
+  })
+  .reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
+
     // Taxable Income Calculation (Current FY Only)
     const totalTaxable = transactions
       .filter((t) => {
@@ -65,15 +72,16 @@ const HomePage = ({
       })
       .reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
 
-    const estimatedTax = totalTaxable > 700000 ? totalTaxable * 0.15 : 0;
-
-    return {
-      expense,
-      netWorth,
-      totalTaxable,
-      estimatedTax,
-      count: transactions.length,
-    };
+      // NEW LOGIC: Standard Deduction of 75k for New Regime
+const taxableIncomeValue = Math.max(0, totalIncome - 75000);
+// NEW REBATE: No tax if taxable income <= 12,00,000
+const estimatedTax = taxableIncomeValue > 1200000 ? (calculateActualTax(taxableIncomeValue)) : 0;
+return {
+  expense,
+  netWorth,
+totalTaxable: taxableIncomeValue, // Change this to show income AFTER deduction  estimatedTax, // This is the Liability
+  count: transactions.length,
+};
   }, [transactions, wealthItems]);
 
   const budget = parseFloat(settings?.monthlyBudget) || 0;
@@ -224,7 +232,7 @@ const HomePage = ({
             value={
               metrics.estimatedTax > 0
                 ? `${formatIndianCompact(metrics.estimatedTax)}`
-                : "File Now"
+                : "₹0 (Tax Free)"
             }
             icon={Scale}
             colorClass="bg-rose-500/10 text-rose-500"
@@ -236,7 +244,7 @@ const HomePage = ({
             <MetricTile
               title="Taxable"
               // Corrected: formatIndianCompact adds symbol, so we don't add "₹"
-              value={formatIndianCompact(metrics.estimatedTax)}
+              value={formatIndianCompact(metrics.totalTaxable)}
               icon={FileText}
               colorClass="bg-blue-500/10 text-blue-500"
               tab={TABS.AUDIT}

@@ -40,19 +40,17 @@ const calculateOldRegimeTax = (taxableIncome: number): number => {
   if (taxableIncome <= 250000) return 0;
   if (taxableIncome <= 500000) return (taxableIncome - 250000) * 0.05;
   if (taxableIncome <= 1000000) return 12500 + (taxableIncome - 500000) * 0.2;
-  return 12500 + 100000 + (taxableIncome - 1000000) * 0.3;
+  return 112500 + (taxableIncome - 1000000) * 0.3;
 };
 
 const calculateNewRegimeTax = (taxableIncome: number): number => {
-  // FY 2024-25 New Regime Slabs
-  if (taxableIncome <= 300000) return 0;
-  if (taxableIncome <= 700000) return (taxableIncome - 300000) * 0.05;
-  if (taxableIncome <= 1000000) return 20000 + (taxableIncome - 700000) * 0.1;
-  if (taxableIncome <= 1200000)
-    return 20000 + 30000 + (taxableIncome - 1000000) * 0.15;
-  if (taxableIncome <= 1500000)
-    return 20000 + 30000 + 30000 + (taxableIncome - 1200000) * 0.2;
-  return 20000 + 30000 + 30000 + 60000 + (taxableIncome - 1500000) * 0.3;
+  // NEW SLABS for FY 2025-26
+  // 0-4L: Nil | 4-8L: 5% | 8-12L: 10% | 12-15L: 15% | Above 15L: 30% (simplified for the logic)
+  if (taxableIncome <= 400000) return 0;
+  if (taxableIncome <= 800000) return (taxableIncome - 400000) * 0.05;
+  if (taxableIncome <= 1200000) return 20000 + (taxableIncome - 800000) * 0.1;
+  if (taxableIncome <= 1500000) return 20000 + 40000 + (taxableIncome - 1200000) * 0.15;
+  return 20000 + 40000 + 45000 + (taxableIncome - 1500000) * 0.3;
 };
 
 // Format currency
@@ -217,58 +215,48 @@ export function ITRCalculator() {
 
   // Calculate tax based on regime
   const taxResult = useMemo((): TaxResult => {
-    const grossIncome =
-      income.salary +
-      income.housePropertyIncome +
-      income.businessIncome +
-      income.capitalGains +
-      income.otherIncome +
-      income.interestIncome;
+    const grossIncome = Object.values(income).reduce((a, b) => a + b, 0);
+    const currentSD = 75000;
 
-    let totalDeductions = 0;
-
+ let totalDeductions = 0;
     if (taxRegime === "old") {
       totalDeductions =
         Math.min(deductions.section80C, 150000) +
         Math.min(deductions.section80D, 75000) +
-        deductions.section80E +
-        deductions.section80G +
-        deductions.hra +
-        deductions.standardDeduction +
+        deductions.section80E + deductions.section80G +
+        deductions.hra + 50000 + // Old regime SD is 50k
         Math.min(deductions.homeLoanInterest, 200000) +
         Math.min(deductions.nps80CCD, 50000);
     } else {
-      // New regime - only standard deduction of 75K
-      totalDeductions = 75000;
+      totalDeductions = currentSD;
     }
 
-    const taxableIncome = Math.max(0, grossIncome - totalDeductions);
+const taxableIncome = Math.max(0, grossIncome - totalDeductions);
 
     const taxBeforeCess =
       taxRegime === "old"
         ? calculateOldRegimeTax(taxableIncome)
         : calculateNewRegimeTax(taxableIncome);
 
-    // Rebate u/s 87A
+// REBATE Section 87A Updated for FY 2025-26
+    // New Regime: No tax if taxable income <= 12,00,000
+    // Old Regime: No tax if taxable income <= 5,00,000    
     let finalTaxBeforeCess = taxBeforeCess;
-    if (taxRegime === "new" && taxableIncome <= 700000) {
+    if (taxRegime === "new" && taxableIncome <= 1200000) {
       finalTaxBeforeCess = 0;
     } else if (taxRegime === "old" && taxableIncome <= 500000) {
       finalTaxBeforeCess = 0;
     }
 
-    const cess = finalTaxBeforeCess * 0.04;
-    const totalTax = finalTaxBeforeCess + cess;
-    const effectiveRate = grossIncome > 0 ? (totalTax / grossIncome) * 100 : 0;
-
+ const cess = taxBeforeCess * 0.04;
     return {
       grossIncome,
       totalDeductions,
       taxableIncome,
-      taxBeforeCess: finalTaxBeforeCess,
+      taxBeforeCess,
       cess,
-      totalTax,
-      effectiveRate,
+      totalTax: taxBeforeCess + cess,
+      effectiveRate: grossIncome > 0 ? ((taxBeforeCess + cess) / grossIncome) * 100 : 0,
     };
   }, [income, deductions, taxRegime]);
 
@@ -356,8 +344,7 @@ export function ITRCalculator() {
             ITR Calculator & Filing
           </h1>
           <p className="mt-2 text-gray-600">
-            Calculate your income tax and file ITR for FY 2024-25
-          </p>
+Calculate your income tax for FY 2025-26 (AY 2026-27)          </p>
         </div>
 
         {/* Main Card */}
@@ -662,10 +649,11 @@ export function ITRCalculator() {
                     Lower rates, minimal deductions
                   </p>
                   <div className="space-y-1 text-xs text-gray-500">
-                    <p>• Up to ₹3L: Nil</p>
-                    <p>• ₹3L - ₹7L: 5%</p>
-                    <p>• ₹7L - ₹10L: 10%</p>
-                    <p>• Above ₹15L: 30%</p>
+<p>• Up to ₹4L: Nil</p>
+        <p>• ₹4L - ₹8L: 5%</p>
+        <p>• ₹8L - ₹12L: 10%</p>
+        <p>• ₹12L - ₹16L: 15%</p> {/* Add this */}
+        <p>• Rebate up to ₹12L</p>
                   </div>
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <p className="text-sm font-medium text-gray-700">

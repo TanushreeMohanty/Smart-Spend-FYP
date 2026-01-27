@@ -58,38 +58,40 @@ export const UNITS = [
 ];
 
 export const TAX_CONSTANTS = {
-  LIMITS: { 
-    SECTION_80C: 150000, 
-    SECTION_80D_SELF: 25000, 
-    SECTION_80D_PARENTS: 50000, 
-    SEC_80CCD_1B: 50000, 
-    SECTION_80E: Infinity, 
-    SECTION_24B: 200000, 
-    SECTION_80TTA: 10000, 
-    STANDARD_DEDUCTION: 75000, 
+  NEW_REGIME: {
+    SLABS: [
+      { limit: 400000, rate: 0.00 },   // 0 - 4L
+      { limit: 800000, rate: 0.05 },   // 4L - 8L
+      { limit: 1200000, rate: 0.10 },  // 8L - 12L
+      { limit: 1600000, rate: 0.15 },  // 12L - 16L
+      { limit: 2000000, rate: 0.20 },  // 16L - 20L
+      { limit: 2400000, rate: 0.25 },  // 20L - 24L
+      { limit: null, rate: 0.30 }      // Above 24L
+    ],
+    REBATE_LIMIT: 1200000, // Section 87A rebate up to 12L taxable income
+    REBATE_MAX: 60000,     // Max rebate amount for FY 25-26
+    STANDARD_DEDUCTION: 75000,
+    CESS: 0.04
+  },
+  OLD_REGIME: {
+    SLABS: [
+      { limit: 250000, rate: 0.00 },
+      { limit: 500000, rate: 0.05 },
+      { limit: 1000000, rate: 0.20 },
+      { limit: null, rate: 0.30 }
+    ],
+    REBATE_LIMIT: 500000,
+    REBATE_MAX: 12500,
+    STANDARD_DEDUCTION: 50000,
+    CESS: 0.04
+  },
+  LIMITS: {
+    SECTION_80C: 150000,
+    SECTION_80D_SELF: 25000,
+    SECTION_80D_PARENTS: 50000,
+    SEC_80CCD_1B: 50000,
+    SECTION_80TTA: 10000,
     PRESUMPTIVE_44ADA: 0.50,
-    PRESUMPTIVE_TURNOVER_LIMIT: 7500000
-  },
-  OLD_REGIME: { 
-    SLABS: [
-        { limit: 250000, rate: 0 }, 
-        { limit: 500000, rate: 0.05 }, 
-        { limit: 1000000, rate: 0.20 }, 
-        { limit: Infinity, rate: 0.30 }
-    ], 
-    REBATE_LIMIT: 500000, 
-    CESS: 0.04 
-  },
-  NEW_REGIME: { 
-    SLABS: [
-        { limit: 300000, rate: 0 }, 
-        { limit: 700000, rate: 0.05 },  
-        { limit: 1000000, rate: 0.10 }, 
-        { limit: 1200000, rate: 0.15 }, 
-        { limit: 1500000, rate: 0.20 }, 
-        { limit: Infinity, rate: 0.30 }
-    ], 
-    REBATE_LIMIT: 700000, 
-    CESS: 0.04 
+    PRESUMPTIVE_TURNOVER_LIMIT: 30000000 // Updated to 3Cr for FY 25-26
   }
 };
