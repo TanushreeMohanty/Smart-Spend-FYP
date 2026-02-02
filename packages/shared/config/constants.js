@@ -6,19 +6,32 @@ import {
   Car, Gift, Smartphone, Activity 
 } from 'lucide-react';
 
+// --- HELPER TO DETECT ENVIRONMENT ---
+const getEnv = (key) => {
+  // Check for Vite (Web)
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[`VITE_${key}`];
+  }
+  // Check for Expo (Mobile)
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[`EXPO_PUBLIC_${key}`];
+  }
+  return null;
+};
+
 // --- VERSION & METADATA ---
-export const APP_VERSION = import.meta.env.VITE_APP_VERSION || "1.0.0";
-export const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+export const APP_VERSION = getEnv('APP_VERSION') || "1.0.0";
+export const API_KEY = getEnv('GEMINI_API_KEY');
 
 // --- FIREBASE INIT ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+const firebaseConfig = {
+  apiKey: getEnv('FIREBASE_API_KEY'),
+  authDomain: getEnv('FIREBASE_AUTH_DOMAIN'),
+  projectId: getEnv('FIREBASE_PROJECT_ID'),
+  storageBucket: getEnv('FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: getEnv('FIREBASE_MESSAGING_SENDER_ID'),
+  appId: getEnv('FIREBASE_APP_ID'),
+  measurementId: getEnv('FIREBASE_MEASUREMENT_ID'),
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -60,16 +73,16 @@ export const UNITS = [
 export const TAX_CONSTANTS = {
   NEW_REGIME: {
     SLABS: [
-      { limit: 400000, rate: 0.00 },   // 0 - 4L
-      { limit: 800000, rate: 0.05 },   // 4L - 8L
-      { limit: 1200000, rate: 0.10 },  // 8L - 12L
-      { limit: 1600000, rate: 0.15 },  // 12L - 16L
-      { limit: 2000000, rate: 0.20 },  // 16L - 20L
-      { limit: 2400000, rate: 0.25 },  // 20L - 24L
-      { limit: null, rate: 0.30 }      // Above 24L
+      { limit: 400000, rate: 0.00 },
+      { limit: 800000, rate: 0.05 },
+      { limit: 1200000, rate: 0.10 },
+      { limit: 1600000, rate: 0.15 },
+      { limit: 2000000, rate: 0.20 },
+      { limit: 2400000, rate: 0.25 },
+      { limit: null, rate: 0.30 }
     ],
-    REBATE_LIMIT: 1200000, // Section 87A rebate up to 12L taxable income
-    REBATE_MAX: 60000,     // Max rebate amount for FY 25-26
+    REBATE_LIMIT: 1200000,
+    REBATE_MAX: 60000,
     STANDARD_DEDUCTION: 75000,
     CESS: 0.04
   },
@@ -92,6 +105,6 @@ export const TAX_CONSTANTS = {
     SEC_80CCD_1B: 50000,
     SECTION_80TTA: 10000,
     PRESUMPTIVE_44ADA: 0.50,
-    PRESUMPTIVE_TURNOVER_LIMIT: 30000000 // Updated to 3Cr for FY 25-26
+    PRESUMPTIVE_TURNOVER_LIMIT: 30000000
   }
 };
