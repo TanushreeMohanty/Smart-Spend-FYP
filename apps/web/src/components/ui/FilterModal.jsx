@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, RotateCcw, Calendar, IndianRupee } from 'lucide-react';
-import { CATEGORIES } from '../../config/constants';
+import { CATEGORIES } from '../../../../../packages/shared/config/constants';
 
 const FilterModal = ({ isOpen, onClose, currentFilters, onApply }) => {
     // Local state for the modal form

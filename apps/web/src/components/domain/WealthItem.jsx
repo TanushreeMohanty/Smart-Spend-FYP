@@ -1,6 +1,6 @@
 import React from 'react';
 import { Trash2, Building2, FileText } from 'lucide-react';
-import { formatIndianCompact } from '../../utils/helpers';
+import { formatIndianCompact } from '../../../../../packages/shared/utils/helpers';
 
 const WealthItem = ({ item, onDelete }) => {
     const isAsset = item.type === 'asset';

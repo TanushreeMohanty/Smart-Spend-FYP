@@ -24,10 +24,10 @@ import {
   FileCheck,
   ArrowRight,
 } from "lucide-react";
-import { TaxService } from "../services/taxService";
-import { AIService } from "../services/aiService";
-import { formatIndianCompact } from "../utils/helpers";
-import { TABS } from "../config/constants";
+import { TaxService } from "../../../../packages/shared/services/taxService";
+import { AIService } from "../../../../packages/shared/services/aiService";
+import { formatIndianCompact } from "../../../../packages/shared/utils/helpers";
+import { TABS } from "../../../../packages/shared/config/constants";
 
 // ==========================================
 // SUB-COMPONENT: DEDUCTION PROGRESS BAR

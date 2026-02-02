@@ -8,9 +8,9 @@ import {
   PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
   BarChart, Bar, XAxis, YAxis, CartesianGrid 
 } from 'recharts';
-import { CATEGORIES } from '../config/constants';
-import { normalizeDate, formatIndianCompact } from '../utils/helpers';
-import { AIService } from '../services/aiService';
+import { CATEGORIES } from '../../../../packages/shared/config/constants';
+import { normalizeDate, formatIndianCompact } from '../../../../packages/shared/utils/helpers';
+import { AIService } from '../../../../packages/shared/services/aiService';
 
 // --- CONFIG ---
 const COLORS = ['#0ea5e9', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#ec4899', '#6366f1', '#06b6d4', '#64748b'];

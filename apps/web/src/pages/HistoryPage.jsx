@@ -4,9 +4,9 @@ import { Search, X, Trash2, Filter, SlidersHorizontal, Download } from 'lucide-r
 import TransactionItem from '../components/domain/TransactionItem';
 import FilterModal from '../components/ui/FilterModal';
 import EditTransactionModal from '../components/ui/EditTransactionModal';
-import { TABS } from '../config/constants';
-import { normalizeDate } from '../utils/helpers';
-import { downloadCSV } from '../utils/exportUtils';
+import { TABS } from '../../../../packages/shared/config/constants';
+import { normalizeDate } from '../../../../packages/shared/utils/helpers';
+import { downloadCSV } from "../../../../packages/shared/utils/exportUtils";
 
 const HistoryPage = ({ transactions, onDelete, onBulkDelete, setActiveTab, onUpdate }) => {
     // UI State

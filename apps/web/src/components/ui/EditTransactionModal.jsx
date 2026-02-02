@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, IndianRupee, Type, ShieldAlert } from 'lucide-react';
-import { CATEGORIES } from '../../config/constants';
-import { normalizeDate } from '../../utils/helpers';
+import { CATEGORIES } from '../../../../../packages/shared/config/constants';
+import { normalizeDate } from '../../../../../packages/shared/utils/helpers';
 
 const EditTransactionModal = ({ isOpen, onClose, transaction, onSave }) => {
     const [formData, setFormData] = useState({

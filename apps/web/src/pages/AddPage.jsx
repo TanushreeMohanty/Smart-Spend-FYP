@@ -16,11 +16,11 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import { db, CATEGORIES, TABS } from "../config/constants";
-import { LocalRepository } from "../services/localRepository";
-import { StorageService } from "../services/storageService";
-import { ParserService } from "../services/parserService";
-import { loadScript } from "../utils/helpers";
+import { db, CATEGORIES, TABS } from "../../../../packages/shared/config/constants";
+import { LocalRepository } from "../../../../packages/shared/services/localRepository";
+import { StorageService } from "../../../../packages/shared/services/storageService";
+import { ParserService } from "../../../../packages/shared/services/parserService";
+import { loadScript } from "../../../../packages/shared/utils/helpers";
 import UnitSelector from "../components/domain/UnitSelector";
 import TransactionItem from "../components/domain/TransactionItem";
 

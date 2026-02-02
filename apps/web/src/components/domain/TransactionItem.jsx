@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trash2, AlertTriangle, Edit2, ShieldCheck, User } from 'lucide-react'; // Import ShieldCheck
-import { CATEGORIES } from '../../config/constants';
-import { normalizeDate } from '../../utils/helpers';
+import { CATEGORIES } from '../../../../../packages/shared/config/constants';
+import { normalizeDate } from '../../../../../packages/shared/utils/helpers';
 
 const TransactionItem = ({ item, onDelete, onEdit }) => {
   const category = CATEGORIES.find(c => c.id === item.category) || CATEGORIES[9];

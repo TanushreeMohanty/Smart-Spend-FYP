@@ -12,9 +12,9 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import TransactionItem from "../components/domain/TransactionItem";
-import { TABS } from "../config/constants";
-import { normalizeDate, formatIndianCompact } from "../utils/helpers";
-import { cn } from "../utils/cn";
+import { TABS } from "../../../../packages/shared/config/constants";
+import { normalizeDate, formatIndianCompact } from "../../../../packages/shared/utils/helpers";
+import { cn } from "../../../../packages/shared/utils/cn";
 
 const HomePage = ({
   transactions,

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Home, ListFilter, Plus, ClipboardCheck, PieChart, Landmark, User, Wallet, LogOut, Menu, X 
 } from 'lucide-react';
-import { TABS } from '../../config/constants';
+import { TABS } from '../../../../../packages/shared/config/constants';
 
 export const Navigation = ({ activeTab, setActiveTab, onSignOut }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

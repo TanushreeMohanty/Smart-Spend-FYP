@@ -1,0 +1,10 @@
+{
+  "name": "@spendsy/mobile",
+  "main": "index.js",
+  "dependencies": {
+    "expo": "~54.0.33",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "4.12.0"
+  }
+}

@@ -3,7 +3,7 @@ import {
   collection, query, orderBy, limit, onSnapshot, doc, getDoc, 
   setDoc, deleteDoc, writeBatch 
 } from 'firebase/firestore';
-import { db } from '../config/constants';
+import { db } from "../config/constants";
 import { useAuth } from './AuthContext';
 
 const DataContext = createContext();

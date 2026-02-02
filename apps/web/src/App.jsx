@@ -12,13 +12,13 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 // Context (Logic preserved 100%)
-import { useAuth } from "./context/AuthContext";
-import { useData } from "./context/DataContext";
+import { useAuth } from "../../../packages/shared/context/AuthContext";
+import { useData } from "../../../packages/shared/context/DataContext";
 
 // Config & Utils
-import { TABS, APP_VERSION } from "./config/constants";
-import { formatIndianCompact } from "./utils/helpers";
-import { cn } from "./utils/cn";
+import { TABS, APP_VERSION } from "../../../packages/shared/config/constants";
+import { formatIndianCompact } from "../../../packages/shared/utils/helpers";
+import { cn } from "../../../packages/shared/utils/cn";
 
 // Components
 import { Navigation } from "./components/ui/Navigation";

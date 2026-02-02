@@ -4,7 +4,7 @@ import {
   Wallet, TrendingUp, DollarSign, PieChart, CreditCard, 
   Landmark, Coins, PiggyBank, Receipt, Briefcase, Gem 
 } from 'lucide-react';
-import { APP_VERSION } from '../config/constants';
+import { APP_VERSION } from '../../../../packages/shared/config/constants';
 
 const LoginScreen = ({ onLoginGoogle, onGuest, error }) => (
   <div className="min-h-screen w-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900 via-slate-900 to-black text-white flex flex-col items-center justify-center p-6">

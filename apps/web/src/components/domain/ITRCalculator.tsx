@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { cn } from "../../utils/cn";
+import { cn } from "../../../../../packages/shared/utils/cn";
 
 // Types for ITR Calculator
 interface IncomeDetails {

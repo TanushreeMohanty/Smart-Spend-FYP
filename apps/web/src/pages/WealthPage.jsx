@@ -8,8 +8,8 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
-import { db } from "../config/constants";
-import { formatIndianCompact } from "../utils/helpers";
+import { db } from "../../../../packages/shared/config/constants";
+import { formatIndianCompact } from "../../../../packages/shared/utils/helpers";
 import UnitSelector from "../components/domain/UnitSelector";
 import WealthItem from "../components/domain/WealthItem";
 
