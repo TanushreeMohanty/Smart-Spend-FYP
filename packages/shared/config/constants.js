@@ -1,22 +1,27 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { 
-  Briefcase, TrendingUp, Home as HomeIcon, Zap, Coffee, ShoppingBag, 
-  Car, Gift, Smartphone, Activity 
-} from 'lucide-react';
+
+// 1. Standard Web Import (Metro will alias this for mobile later)
+import * as LucideIcons from 'lucide-react';
 
 // --- HELPER TO DETECT ENVIRONMENT ---
 const getEnv = (key) => {
-  // Check for Vite (Web)
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    return import.meta.env[`VITE_${key}`];
-  }
-  // Check for Expo (Mobile)
+  // Try Mobile/Expo style first
   if (typeof process !== 'undefined' && process.env) {
-    return process.env[`EXPO_PUBLIC_${key}`];
+    const mobileVal = process.env[`EXPO_PUBLIC_${key}`] || process.env[key];
+    if (mobileVal) return mobileVal;
   }
-  return null;
+
+  // Try Web/Vite style (Wrapped in try-catch to prevent Hermes crash)
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      return import.meta.env[`VITE_${key}`];
+    }
+  } catch (e) {
+    // Silence error on mobile
+  }
+  return undefined;
 };
 
 // --- VERSION & METADATA ---
@@ -39,6 +44,11 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 // --- DOMAIN CONSTANTS ---
+const { 
+  Briefcase, TrendingUp, Home: HomeIcon, Zap, Coffee, 
+  ShoppingBag, Car, Gift, Smartphone, Activity 
+} = LucideIcons;
+
 export const CATEGORIES = [
   { id: 'salary', name: 'Salary', icon: Briefcase, color: 'bg-emerald-500/20 text-emerald-300', keywords: ['payroll', 'salary', 'deposit', 'transfer', 'neft', 'imps', 'credit interest'] },
   { id: 'investment', name: 'Invest', icon: TrendingUp, color: 'bg-teal-500/20 text-teal-300', keywords: ['zerodha', 'groww', 'upstox', 'vanguard', 'fidelity', 'crypto', 'coinbase', 'stock', 'sip', 'mutual', 'ppf', 'nps', 'elss', 'redeem'] },
@@ -52,59 +62,17 @@ export const CATEGORIES = [
   { id: 'other', name: 'Other', icon: Activity, color: 'bg-slate-500/20 text-slate-300', keywords: [] },
 ];
 
-export const TABS = { 
-  HOME: 'home', 
-  HISTORY: 'history', 
-  ADD: 'add', 
-  AUDIT: 'audit', 
-  STATS: 'stats', 
-  WEALTH: 'wealth', 
-  PROFILE: 'profile',
-  ITR: 'itr' 
-};
-
-export const UNITS = [ 
-  { label: '₹', value: 1 }, 
-  { label: 'K', value: 1000 }, 
-  { label: 'L', value: 100000 }, 
-  { label: 'Cr', value: 10000000 } 
-];
+export const TABS = { HOME: 'home', HISTORY: 'history', ADD: 'add', AUDIT: 'audit', STATS: 'stats', WEALTH: 'wealth', PROFILE: 'profile', ITR: 'itr' };
+export const UNITS = [ { label: '₹', value: 1 }, { label: 'K', value: 1000 }, { label: 'L', value: 100000 }, { label: 'Cr', value: 10000000 } ];
 
 export const TAX_CONSTANTS = {
   NEW_REGIME: {
-    SLABS: [
-      { limit: 400000, rate: 0.00 },
-      { limit: 800000, rate: 0.05 },
-      { limit: 1200000, rate: 0.10 },
-      { limit: 1600000, rate: 0.15 },
-      { limit: 2000000, rate: 0.20 },
-      { limit: 2400000, rate: 0.25 },
-      { limit: null, rate: 0.30 }
-    ],
-    REBATE_LIMIT: 1200000,
-    REBATE_MAX: 60000,
-    STANDARD_DEDUCTION: 75000,
-    CESS: 0.04
+    SLABS: [{ limit: 400000, rate: 0.00 }, { limit: 800000, rate: 0.05 }, { limit: 1200000, rate: 0.10 }, { limit: 1600000, rate: 0.15 }, { limit: 2000000, rate: 0.20 }, { limit: 2400000, rate: 0.25 }, { limit: null, rate: 0.30 }],
+    REBATE_LIMIT: 1200000, REBATE_MAX: 60000, STANDARD_DEDUCTION: 75000, CESS: 0.04
   },
   OLD_REGIME: {
-    SLABS: [
-      { limit: 250000, rate: 0.00 },
-      { limit: 500000, rate: 0.05 },
-      { limit: 1000000, rate: 0.20 },
-      { limit: null, rate: 0.30 }
-    ],
-    REBATE_LIMIT: 500000,
-    REBATE_MAX: 12500,
-    STANDARD_DEDUCTION: 50000,
-    CESS: 0.04
+    SLABS: [{ limit: 250000, rate: 0.00 }, { limit: 500000, rate: 0.05 }, { limit: 1000000, rate: 0.20 }, { limit: null, rate: 0.30 }],
+    REBATE_LIMIT: 500000, REBATE_MAX: 12500, STANDARD_DEDUCTION: 50000, CESS: 0.04
   },
-  LIMITS: {
-    SECTION_80C: 150000,
-    SECTION_80D_SELF: 25000,
-    SECTION_80D_PARENTS: 50000,
-    SEC_80CCD_1B: 50000,
-    SECTION_80TTA: 10000,
-    PRESUMPTIVE_44ADA: 0.50,
-    PRESUMPTIVE_TURNOVER_LIMIT: 30000000
-  }
+  LIMITS: { SECTION_80C: 150000, SECTION_80D_SELF: 25000, SECTION_80D_PARENTS: 50000, SEC_80CCD_1B: 50000, SECTION_80TTA: 10000, PRESUMPTIVE_44ADA: 0.50, PRESUMPTIVE_TURNOVER_LIMIT: 30000000 }
 };
