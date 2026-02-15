@@ -1,3 +1,4 @@
+//Database needed
 // Section 1 Home Page
 import React, { useMemo } from "react";
 import { motion } from "framer-motion";
@@ -236,7 +237,7 @@ const metrics = useMemo(() => {
           </motion.div>
 
           {/* ITR Tile */}
-          {/* <MetricTile
+          <MetricTile
             title="Tax Payable"
             value={
               metrics.estimatedTax > 0
@@ -246,18 +247,18 @@ const metrics = useMemo(() => {
             icon={Scale}
             colorClass="bg-rose-500/10 text-rose-500"
             tab={TABS.ITR}
-          /> */}
+          />
 
           {/* Bottom Grid */}
           <div className="grid grid-cols-2 gap-4">
-            {/* <MetricTile
+            <MetricTile
               title="Taxable Income"
               // Corrected: formatIndianCompact adds symbol, so we don't add "₹"
               value={formatIndianCompact(metrics.totalTaxable)}
               icon={FileText}
               colorClass="bg-blue-500/10 text-blue-500"
               tab={TABS.AUDIT}
-            /> */}
+            />
             <MetricTile
               title="Net Worth"
               // Corrected: formatIndianCompact adds symbol, so we don't add "₹"

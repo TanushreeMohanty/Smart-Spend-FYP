@@ -1,3 +1,4 @@
+//No database needed
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Pin,
@@ -66,6 +67,7 @@ const API_BASE_URL = "http://127.0.0.1:8000/api";
   } = useData();
 
   // --- 2. Local UI State ---
+  const [showWizard, setShowWizard] = useState(false);
   const [activeTab, setActiveTab] = useState(TABS.HOME);
   const [isHeaderPinned, setIsHeaderPinned] = useState(true);
   const [scrollOpacity, setScrollOpacity] = useState(1);
@@ -75,12 +77,10 @@ const API_BASE_URL = "http://127.0.0.1:8000/api";
     message: "",
     action: null,
   });
-  const [showWizard, setShowWizard] = useState(false);
   const [theme, setTheme] = useState(
     () => localStorage.getItem("app_theme") || "dark",
   );
   const layoutMode = "desktop-full"; // Force desktop view
-  // Removed toggleLayout function and state
 
   // --- 3. Helpers (Original Logic) ---
   const showToast = useCallback((msg, type = "info") => {
@@ -121,34 +121,43 @@ const API_BASE_URL = "http://127.0.0.1:8000/api";
     if (user) checkBackend();
   }, [user, showToast]);
 
-  useEffect(() => {
+useEffect(() => {
+    // 1. ASYNC PDF WORKER INITIALIZATION
     const loadPdfWorker = async () => {
-      const src =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      const src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
       if (!document.querySelector(`script[src="${src}"]`)) {
         const script = document.createElement("script");
         script.src = src;
+        script.async = true; // Added for performance
         script.onload = () => {
-          if (window.pdfjsLib)
+          if (window.pdfjsLib) {
             window.pdfjsLib.GlobalWorkerOptions.workerSrc =
               "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+          }
         };
         document.head.appendChild(script);
       }
     };
     loadPdfWorker();
+
+    // 2. HEADER PIN PREFERENCE
     const savedPin = localStorage.getItem("smartSpend_header_pinned");
-    if (savedPin !== null) setIsHeaderPinned(savedPin === "true");
-    if (
-      user &&
-      !isGuest &&
-      settings &&
-      (!settings.monthlyIncome || parseFloat(settings.monthlyIncome) === 0)
-    ) {
-      const timer = setTimeout(() => setShowWizard(true), 1500);
+    if (savedPin !== null) {
+      setIsHeaderPinned(savedPin === "true");
+    }
+
+    // 3. ONBOARDING WIZARD TRIGGER
+    // Logic: Only show if user is fully logged in, not a guest, 
+    // and Django profile data shows no income.
+    const incomeValue = parseFloat(settings?.monthlyIncome || 0);
+    
+    if (user && !isGuest && settings && incomeValue === 0) {
+      const timer = setTimeout(() => {
+        setShowWizard(true);
+      }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [user, isGuest, settings]);
+  }, [user, isGuest, settings, setIsHeaderPinned, setShowWizard]); // Added setters to dependency array for completeness
 
   useEffect(() => {
     const handleScroll = () => {
@@ -202,57 +211,27 @@ const API_BASE_URL = "http://127.0.0.1:8000/api";
     : "Guest";
 
   // --- 6. Handlers (Original Logic) ---
-  // ADD THIS FOR TESTING:
-  const [testNote, setTestNote] = useState("");
-  const [savedNotes, setSavedNotes] = useState([]);
 
-  const saveToDjango = async () => {
-    if (!testNote) return;
-    try {
-      const response = await fetch(`${API_BASE_URL}/notes/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: testNote }),
-      });
-      const data = await response.json();
-      showToast(`Saved ID: ${data.id}`, "success");
-      setTestNote("");
-      fetchNotes();
-    } catch (err) {
-      showToast("Save failed", "error");
-    }
-  };
+// Inside your main App.jsx
 
-  const fetchNotes = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/notes/`);
-      const data = await res.json();
-      setSavedNotes(data);
-    } catch (err) {
-      console.error("Fetch failed");
-    }
-  }, [API_BASE_URL]);
-  
-  // Fetch notes once on load if user exists
-  useEffect(() => {
-    if (user) fetchNotes();
-  }, [user, fetchNotes]);
-
-  // (Existing handlers like handleWizardComplete follow...)
-
-  const handleWizardComplete = async (wizardData) => {
-    const newSettings = {
-      ...settings,
+// Locate this function around line 250
+const handleWizardComplete = async (wizardData) => {
+  try {
+    const payload = {
       monthlyIncome: wizardData.monthlyIncome,
       monthlyBudget: wizardData.budgetLimit,
-      dailyBudget: (parseFloat(wizardData.budgetLimit) / 30).toFixed(0),
+      isBusiness: wizardData.isBusiness,
+      dailyBudget: Math.floor(wizardData.budgetLimit / 30)
     };
-    await updateSettings(newSettings);
-    const newProfile = { ...taxProfile, isBusiness: wizardData.isBusiness };
-    await updateTaxProfile(newProfile);
-    setShowWizard(false);
-    showToast("Setup Complete! 🚀", "success");
-  };
+
+    await updateSettings(payload);
+    
+    // FIX: Match this name exactly to your useState at the top of App.jsx
+    setShowWizard(false); 
+  } catch (error) {
+    console.error("Save failed:", error);
+  }
+};
 
   const requestDeleteTransaction = (id) =>
     triggerConfirm("Permanently delete?", () => deleteTransaction(id));
@@ -577,36 +556,8 @@ const API_BASE_URL = "http://127.0.0.1:8000/api";
           )}
         >
 
-          {/* ADD THE TESTER UI HERE */}
-          {activeTab === TABS.HOME && (
-            <div className="mb-8 p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md">
-              <h3 className="text-sm font-bold uppercase tracking-widest mb-4 text-blue-400">Persistence Test</h3>
-              <div className="flex gap-4">
-                <input 
-                  className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white outline-none focus:border-blue-500 transition-all"
-                  value={testNote} 
-                  onChange={(e) => setTestNote(e.target.value)} 
-                  placeholder="Enter test data..."
-                />
-                <button 
-                  onClick={saveToDjango}
-                  className="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-xl font-bold transition-all active:scale-95"
-                >
-                  Save to Django
-                </button>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {savedNotes.map((n, i) => (
-                  <span key={i} className="px-3 py-1 bg-white/5 rounded-full text-xs border border-white/5">
-                    {n.content}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
 
           <AnimatePresence mode="wait">
-            {/* ... rest of your motion.div and activeTab logic ... */}
           {/* <AnimatePresence mode="wait"> */}
             <motion.div
               key={activeTab}

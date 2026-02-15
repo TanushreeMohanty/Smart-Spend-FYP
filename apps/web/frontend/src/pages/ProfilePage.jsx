@@ -1,3 +1,4 @@
+// Database needed
 // Section 7 Profile Page
 import React, { useState, useEffect } from 'react';
 import { User, Target, IndianRupee, Loader2 } from 'lucide-react';

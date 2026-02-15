@@ -1,3 +1,4 @@
+// correct code
 // A lightweight wrapper around the browser's native IndexedDB
 const DB_NAME = 'SmartSpend_Offline_DB';
 const DB_VERSION = 1;

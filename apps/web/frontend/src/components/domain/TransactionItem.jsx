@@ -1,3 +1,4 @@
+// Database needed
 import React from 'react';
 import { Trash2, AlertTriangle, Edit2, ShieldCheck, User } from 'lucide-react'; // Import ShieldCheck
 import { CATEGORIES } from '../../../../../../packages/shared/config/constants';

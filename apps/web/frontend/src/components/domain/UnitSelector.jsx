@@ -1,3 +1,4 @@
+// No database needed
 import React from 'react';
 import { UNITS } from '../../../../../../packages/shared/config/constants';
 

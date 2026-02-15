@@ -1,3 +1,4 @@
+//Database needed
 // Section 5 Stats Page
 import React, { useState, useMemo } from 'react';
 import { 

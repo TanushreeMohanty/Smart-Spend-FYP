@@ -1,14 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  collection, query, orderBy, limit, onSnapshot, doc, getDoc, 
-  setDoc, deleteDoc, writeBatch 
-} from 'firebase/firestore';
-import { db } from "../config/constants";
+// correct code
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import { useAuth } from './AuthContext';
 
 const DataContext = createContext();
 export function useData() { return useContext(DataContext); }
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+// --- CONFIGURATION ---
+const API_BASE_URL = 'http://127.0.0.1:8000/api/finance';
 
 export function DataProvider({ children }) {
   const { user } = useAuth();
@@ -20,78 +19,143 @@ export function DataProvider({ children }) {
     annualRent: '', annualEPF: '', healthInsuranceSelf: '', 
     healthInsuranceParents: '', npsContribution: '', isBusiness: false 
   });
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!user || !db) return;
-
-    const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'), orderBy('date', 'desc'), limit(200));
-    const unsubTrans = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTransactions(docs);
-    });
-
-    const wq = collection(db, 'artifacts', appId, 'users', user.uid, 'wealth');
-    const unsubWealth = onSnapshot(wq, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setWealthItems(docs);
-    });
-
-    const fetchSettings = async () => {
-      try {
-        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'preferences');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setSettings(prev => ({ ...prev, ...data }));
-          if (data.taxProfile) setTaxProfile(data.taxProfile);
-        }
-      } catch (e) { console.error(e); }
+  // --- HELPER: GET AUTH HEADERS ---
+  const getAuthHeaders = useCallback(async () => {
+    if (!user) return null;
+    const token = await user.getIdToken();
+    return {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     };
-    fetchSettings();
-
-    return () => { unsubTrans(); unsubWealth(); };
   }, [user]);
 
+  // --- 1. FETCH ALL DATA FROM DJANGO ---
+  const refreshData = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const config = await getAuthHeaders();
+      
+      // Fetch Transactions
+      const transRes = await axios.get(`${API_BASE_URL}/transactions/`, config);
+      setTransactions(transRes.data);
+
+      // Fetch Wealth Items (Assuming you created a wealth endpoint in Django)
+      // const wealthRes = await axios.get(`${API_BASE_URL}/wealth/`, config);
+      // setWealthItems(wealthRes.data);
+
+      // Fetch Profile/Settings
+      const profileRes = await axios.get(`${API_BASE_URL}/profile/`, config);
+      if (profileRes.data) {
+        setSettings({
+          monthlyIncome: profileRes.data.monthly_income || '',
+          monthlyBudget: profileRes.data.monthly_budget || '',
+          dailyBudget: profileRes.data.daily_budget || ''
+        });
+        if (profileRes.data.tax_profile) setTaxProfile(profileRes.data.tax_profile);
+      }
+    } catch (e) {
+      console.error("Django Fetch Error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, getAuthHeaders]);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
+
+  // --- 2. ACTIONS (REWRITTEN FOR DJANGO) ---
+
   const deleteTransaction = async (id) => {
-    setTransactions(prev => prev.filter(t => t.id !== id)); // Optimistic
-    try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'transactions', id)); } catch(e){}
+    setTransactions(prev => prev.filter(t => t.id !== id)); // Optimistic UI
+    try {
+      const config = await getAuthHeaders();
+      await axios.delete(`${API_BASE_URL}/transactions/${id}/`, config);
+    } catch (e) {
+      console.error("Delete failed", e);
+      refreshData(); // Rollback on failure
+    }
   };
 
   const updateTransaction = async (updatedTx) => {
-    const { id, ...data } = updatedTx;
-    try { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'transactions', id), data, { merge: true }); } catch(e){}
+    try {
+      const config = await getAuthHeaders();
+      const { id, ...data } = updatedTx;
+      await axios.patch(`${API_BASE_URL}/transactions/${id}/`, data, config);
+      refreshData();
+    } catch (e) {
+      console.error("Update failed", e);
+    }
   };
 
   const bulkDeleteTransactions = async (items) => {
-     const ids = new Set(items.map(i => i.id));
-     setTransactions(prev => prev.filter(t => !ids.has(t.id))); // Optimistic
-     try {
-        const chunked = []; for (let i = 0; i < items.length; i += 500) chunked.push(items.slice(i, i + 500));
-        for (const chunk of chunked) {
-            const batch = writeBatch(db);
-            chunk.forEach(t => { batch.delete(doc(db, 'artifacts', appId, 'users', user.uid, 'transactions', t.id)); });
-            await batch.commit();
-        }
-     } catch (e){}
+    const ids = items.map(i => i.id);
+    setTransactions(prev => prev.filter(t => !ids.includes(t.id)));
+    try {
+      const config = await getAuthHeaders();
+      // Django needs a custom 'bulk_delete' endpoint or a loop
+      await axios.post(`${API_BASE_URL}/transactions/bulk_delete/`, { ids }, config);
+    } catch (e) {
+      console.error("Bulk delete failed", e);
+      refreshData();
+    }
   };
 
-  const updateSettings = async (newSettings) => {
-      try {
-          await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'preferences'), newSettings, { merge: true });
-          setSettings(newSettings);
-      } catch (e) {}
-  };
+// --- 2. ACTIONS (REWRITTEN FOR DJANGO) ---
+
+const updateSettings = async (newSettings) => {
+  try {
+    const config = await getAuthHeaders();
+    
+    // Ensure numbers are sent as numbers, not strings from input fields
+    const djangoPayload = {
+        monthly_income: parseFloat(newSettings.monthlyIncome) || 0,
+        monthly_budget: parseFloat(newSettings.monthlyBudget) || 0,
+        daily_budget: parseFloat(newSettings.dailyBudget) || 0,
+        is_business: newSettings.isBusiness || false,
+        is_onboarded: true
+    };
+
+    // 1. Send to Django
+    const res = await axios.patch(`${API_BASE_URL}/profile/`, djangoPayload, config);
+    
+    // 2. IMPORTANT: Use the data returned from Django to update local state.
+    // This ensures your frontend 'settings' object matches exactly what is in the DB.
+    if (res.data) {
+      setSettings({
+        monthlyIncome: res.data.monthlyIncome || res.data.monthly_income,
+        monthlyBudget: res.data.monthlyBudget || res.data.monthly_budget,
+        dailyBudget: res.data.dailyBudget || res.data.daily_budget,
+        isBusiness: res.data.isBusiness || res.data.is_business,
+        isOnboarded: res.data.isOnboarded || res.data.is_onboarded
+      });
+    }
+  } catch (e) {
+    console.error("Settings update failed:", e.response?.data || e.message);
+    // Rollback or alert user
+    refreshData(); 
+  }
+};
 
   const updateTaxProfile = async (newProfile) => {
-      try {
-          await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'preferences'), { taxProfile: newProfile }, { merge: true });
-          setTaxProfile(newProfile);
-      } catch (e) {}
+    try {
+      const config = await getAuthHeaders();
+      await axios.patch(`${API_BASE_URL}/profile/`, { tax_profile: newProfile }, config);
+      setTaxProfile(newProfile);
+    } catch (e) {
+      console.error("Tax profile update failed", e);
+    }
   };
 
   const value = {
-    transactions, wealthItems, settings, taxProfile, appId,
-    deleteTransaction, updateTransaction, bulkDeleteTransactions, updateSettings, updateTaxProfile
+    transactions, wealthItems, settings, taxProfile, loading,
+    deleteTransaction, updateTransaction, bulkDeleteTransactions, 
+    updateSettings, updateTaxProfile, refreshData
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

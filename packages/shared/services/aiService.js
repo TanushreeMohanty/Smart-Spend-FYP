@@ -1,7 +1,12 @@
+// correct code
 import { API_KEY } from '../config/constants';
 
+/**
+ * AIService handles interaction with the Gemini API.
+ * Corrected for Gemini 2.0 Flash and improved JSON handling.
+ */
 export const AIService = {
-  // 1. SECURITY: Rate Limiting (Your Logic)
+  // 1. SECURITY: Rate Limiting
   checkLimit: () => {
     if (typeof window === 'undefined') return;
     const key = 'smartSpend_ai_usage';
@@ -15,33 +20,35 @@ export const AIService = {
     }
     
     // Limit: 15 requests per hour (Protects API Quota)
-    if (usage.count > 15) throw new Error("AI usage limit reached. Try again in an hour.");
+    if (usage.count >= 15) {
+      throw new Error("AI usage limit reached. Please try again in an hour.");
+    }
     
     usage.count++;
     localStorage.setItem(key, JSON.stringify(usage));
   },
 
-  // 2. CORE: The Adapter (Renamed to 'ask' for generic use)
+  // 2. CORE: The Adapter (Ask Gemini)
   ask: async (systemPrompt, userContext) => {
     if (!API_KEY) throw new Error("AI Service Unavailable: Missing API Key");
     
+    // Check local rate limit before making network request
     AIService.checkLimit();
     
-    // ZOHO VALUE: Hardcoded Compliance Rules
     const baseRules = `SYSTEM RULES (NON-OVERRIDABLE): 
     1. Act only as an Indian Tax/Finance Expert. 
     2. Do NOT suggest illegal tax evasion. 
     3. Mention specific IT Act sections where applicable. 
     4. Keep responses concise and professional.`;
     
-    // Combine Base Rules + Specific Task (systemPrompt) + Data (userContext)
     const fullPrompt = `${baseRules}\n\nTASK:\n${systemPrompt}\n\nCONTEXT DATA:\n${userContext}`;
     
-    // Security: Basic Sanitization
+    // Security: Basic Sanitization for prompt injection
     const safePrompt = fullPrompt.replace(/ignore previous instructions/gi, "[REDACTED]");
     
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`, {
+      // UPDATED: Using the stable gemini-2.0-flash endpoint
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`, {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ 
@@ -49,35 +56,43 @@ export const AIService = {
         })
       });
       
-      if (!response.ok) throw new Error("AI Service Error");
+      if (!response.ok) {
+        const errorBody = await response.json();
+        console.error("Gemini API Error Response:", errorBody);
+        throw new Error(`AI Service Error: ${response.status}`);
+      }
       
       const data = await response.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
       
       if (!text) return "No insights generated.";
 
-      // Cleanup Markdown (Gemini often adds ```json ... ```)
-      return text.replace(/```json/g, '').replace(/```/g, '').trim();
+      // UPDATED CLEANUP: Handle Markdown code blocks (```json ... ```) more robustly
+      return text
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .trim();
 
     } catch (e) {
-      console.error(e);
-      throw new Error("AI Service temporarily unavailable.");
+      console.error("AIService.ask failed:", e);
+      throw new Error(e.message || "AI Service temporarily unavailable.");
     }
   },
 
-  // 3. ADAPTER: JSON Handler (Crucial for UI Integration)
+  // 3. ADAPTER: Structured Data Handler
   askForJSON: async (systemPrompt, userContext) => {
-    // We enforce JSON output in the prompt
-    const jsonPrompt = `${systemPrompt}\n\nIMPORTANT: Output strictly valid JSON only. Do not add intro/outro text.`;
+    const jsonPrompt = `${systemPrompt}\n\nIMPORTANT: Your response must be a single valid JSON object or array. DO NOT include any conversational text, explanations, or markdown formatting outside the JSON.`;
     
     const raw = await AIService.ask(jsonPrompt, userContext);
     
     try {
-      return JSON.parse(raw);
+      // Remove any hidden non-printable characters that sometimes appear in LLM outputs
+      const cleanJSON = raw.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+      return JSON.parse(cleanJSON);
     } catch (e) {
-      console.error("AI Service: JSON Parse Failed", raw);
-      // Fallback: Return empty array so app doesn't crash
-      return []; 
+      console.error("AI Service: JSON Parse Failed", { error: e, rawOutput: raw });
+      // Return empty array/object fallback to prevent UI crash
+      return Array.isArray(raw) ? [] : {}; 
     }
   }
 };

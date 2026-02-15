@@ -1,3 +1,4 @@
+//No database needed
 import React from 'react';
 import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { Wallet } from 'lucide-react';

@@ -1,3 +1,4 @@
+//correct code
 import { generateId, categorizeTransaction, loadScript } from '../utils/helpers';
 
 // --- HELPER: SCORING ENGINE ---
@@ -29,7 +30,7 @@ const parseAmount = (str) => {
     if (!str) return 0;
     let clean = str.replace(/,/g, '').trim();
     
-    // Detect Sign based on banking keywords (fallback if not detected by line context)
+    // Detect Sign based on banking keywords
     const isDebit = /dr|debit|wdl|out|withdrawal/i.test(clean);
     const isCredit = /cr|credit|dep|in|deposit/i.test(clean);
     
@@ -43,7 +44,6 @@ const parseAmount = (str) => {
 };
 
 // --- HELPER: DIRECTION DETECTOR ---
-// Intelligently decides Income vs Expense based on banking keywords
 const detectTransactionType = (line) => {
     const text = line.toUpperCase();
 
@@ -61,112 +61,102 @@ const detectTransactionType = (line) => {
         return 'expense';
     }
 
-    // 3. Fallback: UPI is usually expense unless it explicitly says received
+    // 3. Fallback: UPI check
     if (text.includes("UPI")) {
         if (text.includes("REC") || text.includes("FROM")) return 'income';
         return 'expense';
     }
 
-    // Default to expense (Safe bet for personal finance)
     return 'expense';
 };
 
 export const ParserService = {
-  patterns: {
+pattern: {
     // Robust date regex for Citibank (02Feb23) & others
     date: /(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4})|(?:\d{1,2}(?:[-/\s]?)(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:[a-z]*)(?:[-/\s]?)\d{2,4})/i,
     // Lines to strictly ignore
     noise: /(page\s+\d+|statement\s+period|account\s+summary|opening\s+balance|closing\s+balance|total|brought\s+forward|relationship\s+value|credit\s+limit|reward\s+points)/i
-  },
+},
 
-  // OPTIMIZATION: Quick check on first 1000 chars only
-  detectMode: (text) => {
+detectMode: (text) => {
     if (!text || text.length < 50) return 'OCR';
     const sample = text.substring(0, 1000); 
     const cleanText = sample.replace(/\s/g, '');
-    // Fixed: Correct Rupee Symbol '₹'
     const readable = cleanText.replace(/[^a-zA-Z0-9.,:/\-₹]/g, '');
     if ((readable.length / (cleanText.length || 1)) < 0.4) return 'OCR'; 
     return 'TEXT';
-  },
+},
 
-  processLines: (lines, source = 'TEXT') => {
+processLines: (lines, source = 'TEXT') => {
     const transactions = [];
     
     lines.forEach(line => {
-      // 1. Skip Noise
-      if (line.length < 10) return;
-      if (ParserService.patterns.noise.test(line.toLowerCase())) return;
+        if (line.length < 10) return;
+        if (ParserService.pattern.noise.test(line)) return;
 
-      // 2. Find Date
-      const dateMatch = line.match(ParserService.patterns.date);
-      if (!dateMatch) return; 
+        const dateMatch = line.match(ParserService.pattern.date);
+        if (!dateMatch) return; 
 
-      // 3. Find Amounts
-      const numberMatches = [...line.matchAll(/(?:\d{1,3}(?:,\d{3})*|\d+)(?:\.\d{2})(?:\s?(?:Cr|Dr))?/gi)];
-      if (!numberMatches || numberMatches.length === 0) return; 
+        // Match patterns like 1,234.56 or 1234.56
+        const numberMatches = [...line.matchAll(/(?:\d{1,3}(?:,\d{3})*|\d+)(?:\.\d{2})(?:\s?(?:Cr|Dr))?/gi)];
+        if (!numberMatches || numberMatches.length === 0) return; 
 
-      // 4. Score Candidates (Eliminate Dates/Page Numbers)
-      let validCandidates = [];
-      numberMatches.forEach(match => {
-          const numStr = match[0];
-          if (dateMatch[0].includes(numStr)) return; 
-          const score = scoreNumberLikelihood(numStr, line);
-          if (score > 0) validCandidates.push({ raw: numStr, value: parseAmount(numStr), index: match.index, score });
-      });
+        let validCandidates = [];
+        numberMatches.forEach(match => {
+            const numStr = match[0];
+            if (dateMatch[0].includes(numStr)) return; 
+            const score = scoreNumberLikelihood(numStr, line);
+            if (score > 0) validCandidates.push({ raw: numStr, value: parseAmount(numStr), index: match.index, score });
+        });
 
-      if (validCandidates.length === 0) return;
+        if (validCandidates.length === 0) return;
 
-      // Select Best Amount (First valid money number found -> Ignores Balance Column)
-      validCandidates.sort((a, b) => a.index - b.index);
-      const bestAmount = validCandidates[0].value;
+        // Sort by position in the string (usually Date | Description | Amount)
+        validCandidates.sort((a, b) => a.index - b.index);
+        const bestAmount = validCandidates[0].value;
 
-      // 5. Clean Description
-      let desc = line.replace(dateMatch[0], '').replace(validCandidates[0].raw, '').trim();
-      if (validCandidates.length > 1) desc = desc.replace(validCandidates[1].raw, '').trim();
+        // Clean Description: Remove date and the amount string
+        let desc = line.replace(dateMatch[0], '').replace(validCandidates[0].raw, '').trim();
+        
+        // FIX: Removed the empty pipe '|' that causes infinite matching/erasing
+        desc = desc.replace(/\s+/g, ' ')
+                    .replace(/[\d,]+\.\d{2}/g, '') 
+                    .replace(/IMPS|NEFT|UPI|Ref\s?no\.?/gi, '') // Removed trailing |
+                    .replace(/[^\w\s\-@.]/gi, '')
+                    .trim();
 
-      desc = desc.replace(/\s+/g, ' ')
-                 .replace(/[\d,]+\.\d{2}/g, '') 
-                 .replace(/IMPS|NEFT|UPI|Ref\s?no\.?|/gi, '')
-                 .replace(/[^\w\s\-@.]/gi, '')
-                 .trim();
+        if (desc.length > 50) desc = desc.substring(0, 50) + "...";
 
-      if (desc.length > 50) desc = desc.substring(0, 50) + "...";
+        const type = detectTransactionType(line);
+        let category = categorizeTransaction(desc);
+        
+        // Safety: Logic override for income categories
+        if (type === 'income' && category !== 'salary' && category !== 'investment') {
+            category = 'other';
+        }
+        if (desc.toLowerCase().includes('salary')) {
+            category = 'salary'; 
+        }
 
-      // 6. AUTO-DETECT TYPE (Income vs Expense)
-      const type = detectTransactionType(line);
-      
-      // 7. Categorize
-      let category = categorizeTransaction(desc);
-      
-      // Safety: Fix rare category mismatch
-      if (type === 'income' && category !== 'salary' && category !== 'investment') {
-          category = 'others';
-      }
-      if (desc.toLowerCase().includes('salary')) {
-          category = 'salary'; 
-      }
-
-      transactions.push({
-          id: generateId(),
-          date: new Date(dateMatch[0]),
-          description: desc || "Transaction",
-          amount: Math.abs(bestAmount),
-          type: type,
-          category: category,
-          confidence: source === 'OCR' ? 80 : 95,
-          bank: "Detected"
-      });
+        transactions.push({
+            id: generateId(),
+            // Standardize for Django DateField
+            date: new Date(dateMatch[0]).toISOString().split('T')[0],
+            description: desc || "Transaction",
+            amount: Math.abs(bestAmount),
+            type: type,
+            category: category,
+            confidence: source === 'OCR' ? 80 : 95,
+            bank: "Detected"
+        });
     });
 
     return transactions;
-  },
+},
 
-  // --- HIGH PERFORMANCE PARALLEL EXTRACTOR ---
-  // Reads 5 pages at once for "Instant" feel
-  extractLinesFromPdf: async (pdfDoc) => {
+extractLinesFromPdf: async (pdfDoc) => {
     let allLines = [];
-    const totalPages = pdfDoc.numPages; // NO LIMIT
+    const totalPages = pdfDoc.numPages;
     const BATCH_SIZE = 5; 
 
     for (let i = 1; i <= totalPages; i += BATCH_SIZE) {
@@ -185,7 +175,7 @@ export const ParserService = {
                 });
                 const pageLines = Object.keys(rows)
                     .sort((a, b) => b - a)
-                    .map(y => rows[y].join('   ').trim()) // Large spacer
+                    .map(y => rows[y].join('   ').trim())
                     .filter(line => line.length > 0);
                 return { pageIndex: j, lines: pageLines };
             }));
@@ -195,10 +185,9 @@ export const ParserService = {
         batchResults.forEach(res => allLines.push(...res.lines));
     }
     return allLines;
-  },
+},
 
-  // --- OCR (Fallback for Image PDFs) ---
-  performOCR: async (file, onProgress) => {
+performOCR: async (file, onProgress) => {
     await loadScript("https://unpkg.com/tesseract.js@v5.0.5/dist/tesseract.min.js");
     if (!window.Tesseract) throw new Error("OCR Engine failed to load");
     
@@ -206,39 +195,39 @@ export const ParserService = {
     let allLines = [];
     
     try {
-      worker = await window.Tesseract.createWorker('eng', 1, { 
-        logger: m => { if (m.status === 'recognizing text' && onProgress) onProgress(Math.floor(m.progress * 100)); } 
-      });
-      
-      const pdf = await window.pdfjsLib.getDocument(await file.arrayBuffer()).promise;
-      const pagesToScan = pdf.numPages;      
-      for (let i = 1; i <= pagesToScan; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2.0 });
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-        const { data: { words } } = await worker.recognize(canvas.toDataURL('image/png'));
-        
-        const rows = [];
-        words.forEach(w => {
-          if (w.confidence < 50) return;
-          const y = Math.round(w.bbox.y0 / 10) * 10;
-          const row = rows.find(r => Math.abs(r.y - y) < 15);
-          if (row) row.items.push(w); else rows.push({ y, items: [w] });
+        worker = await window.Tesseract.createWorker('eng', 1, { 
+            logger: m => { if (m.status === 'recognizing text' && onProgress) onProgress(Math.floor(m.progress * 100)); } 
         });
         
-        rows.sort((a, b) => a.y - b.y);
-        rows.forEach(r => {
-          r.items.sort((a, b) => a.bbox.x0 - b.bbox.x0);
-          const line = r.items.map(w => w.text).join(' ');
-          if (line.length > 5) allLines.push(line);
-        });
-      }
+        const pdf = await window.pdfjsLib.getDocument(await file.arrayBuffer()).promise;
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+            
+            const { data: { words } } = await worker.recognize(canvas.toDataURL('image/png'));
+            
+            const rows = [];
+            words.forEach(w => {
+                if (w.confidence < 50) return;
+                const y = Math.round(w.bbox.y0 / 10) * 10;
+                const row = rows.find(r => Math.abs(r.y - y) < 15);
+                if (row) row.items.push(w); else rows.push({ y, items: [w] });
+            });
+            
+            rows.sort((a, b) => a.y - b.y);
+            rows.forEach(r => {
+                r.items.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+                const line = r.items.map(w => w.text).join(' ');
+                if (line.length > 5) allLines.push(line);
+            });
+        }
     } catch (e) { console.error("OCR Failed", e); throw e; } 
     finally { if (worker) await worker.terminate(); }
     return allLines;
-  }
+}
 };

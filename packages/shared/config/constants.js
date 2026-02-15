@@ -1,29 +1,37 @@
+// correct code
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+// REMOVED: import { getFirestore } from 'firebase/firestore'; 
 
-// 1. Standard Web Import (Metro will alias this for mobile later)
 import * as LucideIcons from 'lucide-react';
 
 // --- HELPER TO DETECT ENVIRONMENT ---
+// --- FIXED HELPER ---
 const getEnv = (key) => {
-  // Try Mobile/Expo style first
+  // 1. Try Mobile/Expo
   if (typeof process !== 'undefined' && process.env) {
     const mobileVal = process.env[`EXPO_PUBLIC_${key}`] || process.env[key];
     if (mobileVal) return mobileVal;
   }
 
-  // Try Web/Vite style (Wrapped in try-catch to prevent Hermes crash)
+  // 2. Try Web/Vite (Correction: Vite requires static access)
   try {
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      return import.meta.env[`VITE_${key}`];
-    }
+    const viteEnvs = {
+      APP_VERSION: import.meta.env.VITE_APP_VERSION,
+      GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY,
+      FIREBASE_API_KEY: import.meta.env.VITE_FIREBASE_API_KEY,
+      FIREBASE_AUTH_DOMAIN: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      FIREBASE_STORAGE_BUCKET: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+      FIREBASE_MESSAGING_SENDER_ID: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      FIREBASE_APP_ID: import.meta.env.VITE_FIREBASE_APP_ID,
+      FIREBASE_MEASUREMENT_ID: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+    };
+    return viteEnvs[key];
   } catch (e) {
-    // Silence error on mobile
+    return undefined;
   }
-  return undefined;
 };
-
 // --- VERSION & METADATA ---
 export const APP_VERSION = getEnv('APP_VERSION') || "1.0.0";
 export const API_KEY = getEnv('GEMINI_API_KEY');
@@ -40,8 +48,13 @@ const firebaseConfig = {
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+// --- EXPORTS ---
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// REMOVED: export const db = getFirestore(app); 
+
+// Note: Your data will now be saved via Django REST API calls 
+// instead of using 'db' (Firestore).
 
 // --- DOMAIN CONSTANTS ---
 const { 

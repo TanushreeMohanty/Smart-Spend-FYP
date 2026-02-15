@@ -1,3 +1,4 @@
+//No database needed
 import React, { useState, useEffect } from 'react';
 import { X, Check, RotateCcw, Calendar, IndianRupee } from 'lucide-react';
 import { CATEGORIES } from '../../../../../../packages/shared/config/constants';

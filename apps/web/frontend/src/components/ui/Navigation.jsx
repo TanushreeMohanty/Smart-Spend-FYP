@@ -1,3 +1,4 @@
+//No database needed
 import React, { useState } from 'react';
 import { 
   Home, ListFilter, Plus, ClipboardCheck, PieChart, Landmark, User, Wallet, LogOut, Menu, X 
@@ -11,7 +12,7 @@ export const Navigation = ({ activeTab, setActiveTab, onSignOut }) => {
     { id: TABS.HOME, icon: Home, label: "Home" },
     { id: TABS.HISTORY, icon: ListFilter, label: "History" },
     { id: TABS.ADD, icon: Plus, label: "Add New" },
-    // { id: TABS.AUDIT, icon: ClipboardCheck, label: "Tax Audit" },
+    { id: TABS.AUDIT, icon: ClipboardCheck, label: "Tax Audit" },
     { id: TABS.STATS, icon: PieChart, label: "Stats" },
     { id: TABS.WEALTH, icon: Landmark, label: "Wealth" },
     { id: TABS.PROFILE, icon: User, label: "Profile" }

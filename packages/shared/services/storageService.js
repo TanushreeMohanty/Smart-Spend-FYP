@@ -1,48 +1,31 @@
-import { 
-  collection, addDoc, deleteDoc, doc, writeBatch, serverTimestamp 
-} from 'firebase/firestore';
-import { db } from '../config/constants';
-
-// Default App ID fallback
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+// correct code
+// REMOVED: All Firestore imports
+import { financeAPI } from './api'; // Import the Django API service we created
 
 export const StorageService = {
+  // 1. SAVE TRANSACTION TO DJANGO
   saveTransaction: async (uid, data) => {
-    await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'transactions'), {
-      ...data,
-      date: serverTimestamp()
-    });
+    // We ignore 'uid' here because Django identifies the user 
+    // automatically via the Bearer Token
+    return await financeAPI.saveTransaction(data);
   },
 
+  // 2. DELETE FROM DJANGO
   deleteTransaction: async (uid, id) => {
-    await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, 'transactions', id));
+    // Note: You'll need to add a delete method to your financeAPI in api.js
+    // if you haven't yet.
+    return await financeAPI.deleteTransaction(id);
   },
 
+  // 3. BULK DELETE FROM DJANGO
   bulkDelete: async (uid, items) => {
-    const chunked = [];
-    // Firestore batch limit is 500
-    for (let i = 0; i < items.length; i += 500) {
-      chunked.push(items.slice(i, i + 500));
-    }
-    
-    for (const chunk of chunked) {
-      const batch = writeBatch(db);
-      chunk.forEach(t => {
-        batch.delete(doc(db, 'artifacts', appId, 'users', uid, 'transactions', t.id));
-      });
-      await batch.commit();
-    }
+    const ids = items.map(item => item.id);
+    return await financeAPI.bulkDeleteTransactions(ids);
   },
 
-  // Wealth / Asset methods
+  // 4. WEALTH / ASSETS
   addWealthItem: async (uid, data) => {
-    await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'wealth'), {
-      ...data,
-      date: serverTimestamp()
-    });
-  },
-
-  deleteWealthItem: async (uid, id) => {
-    await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, 'wealth', id));
+    // Assuming you have a /wealth/ endpoint in Django
+    return await financeAPI.saveWealthItem(data);
   }
 };

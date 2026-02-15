@@ -1,3 +1,4 @@
+//Database needed
 // Section 2 History Page
 import React, { useState, useMemo } from 'react';
 import { Search, X, Trash2, Filter, SlidersHorizontal, Download } from 'lucide-react';

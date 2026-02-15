@@ -1,3 +1,4 @@
+//Database needed
 // Section 6 Wealth Page
 import React, { useState } from "react";
 import {
@@ -8,7 +9,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
-import { db } from "../../../../../packages/shared/config/constants";
+// import { db } from "../../../../../packages/shared/config/constants";
 import { formatIndianCompact } from "../../../../../packages/shared/utils/helpers";
 import UnitSelector from "../components/domain/UnitSelector";
 import WealthItem from "../components/domain/WealthItem";

@@ -1,3 +1,4 @@
+//Database needed
 // Section 3 Add New Page
 import React, { useState, useRef, useEffect } from "react";
 import {
@@ -16,7 +17,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import { db, CATEGORIES, TABS } from "../../../../../packages/shared/config/constants";
+import { CATEGORIES, TABS } from "../../../../../packages/shared/config/constants";
 import { LocalRepository } from "../../../../../packages/shared/services/localRepository";
 import { StorageService } from "../../../../../packages/shared/services/storageService";
 import { ParserService } from "../../../../../packages/shared/services/parserService";

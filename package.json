@@ -8,5 +8,11 @@
   "scripts": {
     "web": "npm run dev -w apps/web",
     "mobile": "npm run start -w apps/mobile"
+  },
+  "dependencies": {
+    "axios": "^1.13.5",
+    "clsx": "^2.1.1",
+    "firebase": "^12.9.0",
+    "tailwind-merge": "^3.4.1"
   }
 }
