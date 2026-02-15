@@ -1,0 +1,320 @@
+// Section 5 Stats Page
+import React, { useState, useMemo } from 'react';
+import { 
+  Bot, Sparkles, Loader2, PieChart, BarChart3, TrendingUp, 
+  AlertTriangle, CheckCircle2, Zap 
+} from 'lucide-react';
+import { 
+  PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid 
+} from 'recharts';
+import { CATEGORIES } from '../../../../../packages/shared/config/constants';
+import { normalizeDate, formatIndianCompact } from '../../../../../packages/shared/utils/helpers';
+import { AIService } from '../../../../../packages/shared/services/aiService';
+
+// --- CONFIG ---
+const COLORS = ['#0ea5e9', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#ec4899', '#6366f1', '#06b6d4', '#64748b'];
+
+// --- SUB-COMPONENT: CUSTOM CHART TOOLTIP ---
+const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-[#0f172a] border border-slate-700 p-3 rounded-xl shadow-2xl backdrop-blur-md z-50">
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">{label}</p>
+                {payload.map((entry, index) => (
+                    <div key={index} className="flex items-center justify-between gap-4 text-xs mb-1">
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: entry.fill }}></div>
+                            <span className="text-slate-300 capitalize">{entry.name}</span>
+                        </div>
+                        <span className="font-mono font-bold text-white">
+                            ₹{entry.value.toLocaleString('en-IN')}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+    return null;
+};
+
+// --- SUB-COMPONENT: INSIGHT CARD ---
+const InsightCard = ({ type, title, message, impact }) => {
+    let styles = "bg-slate-800 border-slate-700 text-slate-300";
+    let Icon = Bot;
+
+    switch (type) {
+        case 'alert':
+            styles = "bg-rose-500/10 border-rose-500/20 text-rose-200";
+            Icon = AlertTriangle;
+            break;
+        case 'tip':
+            styles = "bg-blue-500/10 border-blue-500/20 text-blue-200";
+            Icon = Zap;
+            break;
+        case 'praise':
+            styles = "bg-emerald-500/10 border-emerald-500/20 text-emerald-200";
+            Icon = CheckCircle2;
+            break;
+        case 'trend':
+            styles = "bg-purple-500/10 border-purple-500/20 text-purple-200";
+            Icon = TrendingUp;
+            break;
+        default: break;
+    }
+
+    return (
+        <div className={`p-4 rounded-2xl border ${styles} relative overflow-hidden transition-all hover:scale-[1.02]`}>
+            <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-2">
+                    <Icon className="w-5 h-5 opacity-80" />
+                    <h4 className="font-bold text-sm uppercase tracking-wide opacity-90">{title}</h4>
+                </div>
+                {impact === 'high' && <span className="bg-white/10 text-[10px] font-bold px-2 py-0.5 rounded-full">HIGH IMPACT</span>}
+            </div>
+            <p className="text-xs opacity-80 leading-relaxed">{message}</p>
+        </div>
+    );
+};
+
+// --- MAIN PAGE COMPONENT ---
+const StatsPage = ({ transactions }) => {
+    // State
+    const [aiInsights, setAiInsights] = useState([]); 
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState(null);
+    const [viewMode, setViewMode] = useState('expense'); 
+    const [range, setRange] = useState('6M'); 
+
+    // --- 1. Pie Chart Data (Category Breakdown) ---
+    const pieChartData = useMemo(() => {
+        const categoryMap = {};
+        let total = 0;
+
+        transactions.forEach(t => {
+            if (t.type === viewMode) {
+                const amt = parseFloat(t.amount);
+                const catName = CATEGORIES.find(c => c.id === t.category)?.name || t.category;
+                categoryMap[catName] = (categoryMap[catName] || 0) + amt;
+                total += amt;
+            }
+        });
+
+        const data = Object.entries(categoryMap)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+
+        return { data, total };
+    }, [transactions, viewMode]);
+
+    // --- 2. Bar Chart Data (Robust Logic) ---
+    const trendChartData = useMemo(() => {
+        const dataMap = new Map();
+        
+        // Helper to Generate Unique Keys
+        const getKey = (dateObj, unit) => {
+            const y = dateObj.getFullYear();
+            const m = dateObj.getMonth(); 
+            const d = dateObj.getDate();
+            const h = dateObj.getHours();
+            
+            if (unit === 'hour') return `${y}-${m}-${d}-${h}`;
+            if (unit === 'day') return `${y}-${m}-${d}`;
+            if (unit === 'month') return `${y}-${m}`;
+            return '';
+        };
+
+        // Helper to Initialize Buckets
+        const initData = (count, unit) => {
+            for (let i = count - 1; i >= 0; i--) {
+                const d = new Date(); 
+                let label = '';
+
+                // Adjust date back by 'i' units
+                if (unit === 'hour') {
+                    d.setHours(d.getHours() - i);
+                    const hr = d.getHours();
+                    label = hr === 0 ? '12am' : hr === 12 ? '12pm' : hr > 12 ? `${hr-12}pm` : `${hr}am`;
+                } else if (unit === 'day') {
+                    d.setDate(d.getDate() - i);
+                    label = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+                } else if (unit === 'month') {
+                    d.setDate(1); // Safety fix for 31st bug
+                    d.setMonth(d.getMonth() - i);
+                    label = d.toLocaleDateString('en-US', { month: 'short' });
+                }
+                
+                const key = getKey(d, unit);
+                dataMap.set(key, { 
+                    name: label, 
+                    income: 0, 
+                    expense: 0, 
+                    sortKey: d.getTime() 
+                });
+            }
+        };
+
+        // Initialize Buckets based on Range
+        let unit = 'month'; 
+        if (range === '1D') { initData(24, 'hour'); unit = 'hour'; }
+        else if (range === '1W') { initData(7, 'day'); unit = 'day'; }
+        else if (range === '1M') { initData(30, 'day'); unit = 'day'; }
+        else if (range === '6M') { initData(6, 'month'); unit = 'month'; }
+        else if (range === '1Y') { initData(12, 'month'); unit = 'month'; }
+
+        // Fill Data from ALL Transactions
+        transactions.forEach(t => {
+            const tDate = normalizeDate(t.date); 
+            const key = getKey(tDate, unit);
+
+            if (dataMap.has(key)) {
+                const entry = dataMap.get(key);
+                const amt = parseFloat(t.amount);
+                if (t.type === 'income') entry.income += amt;
+                else entry.expense += amt;
+            }
+        });
+
+        return Array.from(dataMap.values()).sort((a, b) => a.sortKey - b.sortKey);
+    }, [transactions, range]);
+
+    // --- 3. AI Watchdog Engine ---
+    const generateAIInsights = async () => {
+        setAiLoading(true);
+        setAiError(null);
+
+        try {
+            const topCats = pieChartData.data.slice(0, 5).map(c => `${c.name}: ₹${c.value}`).join(', ');
+            const len = trendChartData.length;
+            const recent = len > 0 ? trendChartData[len - 1] : null;
+            const prev = len > 1 ? trendChartData[len - 2] : null;
+            
+            let trendText = "No trend data";
+            if (recent && prev) {
+                const diff = recent.expense - prev.expense;
+                trendText = diff > 0 ? `Expenses up by ₹${diff}` : `Expenses down by ₹${Math.abs(diff)}`;
+            }
+
+            const contextData = `Total Spend: ₹${pieChartData.total}, Top Categories: ${topCats}, Trend: ${trendText}`;
+            const systemPrompt = `Act as a Financial Watchdog. Generate 3 Insight Cards (JSON array) with fields: type (alert/tip/trend), title, message, impact.`;
+
+            const jsonInsights = await AIService.askForJSON(systemPrompt, contextData);
+            setAiInsights(jsonInsights);
+
+        } catch (error) { 
+            console.error(error);
+            setAiError("Watchdog is sleeping (Network Error)."); 
+        } finally { 
+            setAiLoading(false); 
+        }
+    };
+
+    return (
+        <div className="space-y-6 pb-4 animate-in fade-in">
+            {/* Header */}
+            <div className="flex justify-between items-center px-1">
+                <h2 className="text-2xl font-bold text-white">Analytics</h2>
+            </div>
+
+            {/* 1. Watchdog Section (AI) */}
+            <div className="bg-gradient-to-br from-[#0f172a] to-[#1e1b4b] p-6 rounded-[2rem] border border-white/10 relative overflow-hidden shadow-2xl">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[80px] rounded-full pointer-events-none"></div>
+                <div className="flex justify-between items-start mb-6 relative z-10">
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <Bot className="w-5 h-5 text-indigo-400" />
+                            <h3 className="font-bold text-white text-lg tracking-tight">The Watchdog</h3>
+                        </div>
+                        <p className="text-xs text-slate-400">AI-powered financial surveillance</p>
+                    </div>
+                    <button onClick={generateAIInsights} disabled={aiLoading} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg flex items-center gap-2">
+                        {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-yellow-300" />}
+                        {aiLoading ? 'Analyzing...' : 'Run Scan'}
+                    </button>
+                </div>
+                <div className="relative z-10 min-h-[50px]">
+                    {aiError && <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl text-xs text-rose-200 text-center">{aiError}</div>}
+                    {!aiLoading && !aiError && aiInsights.length === 0 && (
+                        <div className="text-center py-6 text-slate-500 text-xs border border-dashed border-slate-700 rounded-xl">Tap 'Run Scan' to detect anomalies.</div>
+                    )}
+                    {aiInsights.length > 0 && (
+                        <div className="space-y-3 animate-in slide-in-from-bottom-4">
+                            {aiInsights.map((insight, idx) => <InsightCard key={idx} {...insight} />)}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* 2. Donut Chart Section */}
+            <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2rem] border border-white/10 relative overflow-hidden">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <PieChart className="w-4 h-4" /> Category Breakdown
+                    <div className="ml-auto flex bg-white/5 rounded-lg p-1 border border-white/10">
+                        <button onClick={() => setViewMode('expense')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${viewMode === 'expense' ? 'bg-rose-500/20 text-rose-300' : 'text-slate-400'}`}>Expense</button>
+                        <button onClick={() => setViewMode('income')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${viewMode === 'income' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-400'}`}>Income</button>
+                    </div>
+                </h3>
+                <div className="h-64 relative">
+                    {pieChartData.data.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RePieChart>
+                                <Pie data={pieChartData.data} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
+                                    {pieChartData.data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                </Pie>
+                                <Tooltip content={<CustomTooltip />} />
+                            </RePieChart>
+                        </ResponsiveContainer>
+                    ) : <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs">No data available</div>}
+                    {pieChartData.data.length > 0 && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span className="text-xs text-slate-400 font-bold uppercase">Total</span>
+                            <span className="text-xl font-bold text-white">{formatIndianCompact(pieChartData.total)}</span>
+                        </div>
+                    )}
+                </div>
+                {/* Legend - Responsive Grid for Mobile */}
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                    {pieChartData.data.map((entry, index) => (
+                        <div key={index} className="flex justify-between items-center text-xs bg-white/5 p-2 rounded-lg">
+                            <div className="flex items-center gap-2 truncate">
+                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                                <span className="text-slate-300 truncate">{entry.name}</span>
+                            </div>
+                            <span className="font-bold text-slate-200 shrink-0 ml-2">{((entry.value / pieChartData.total) * 100).toFixed(0)}%</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* 3. Monthly Trends Bar Chart */}
+            <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2rem] border border-white/10">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4" /> Trend Analysis 
+                    </h3>
+                    <div className="flex bg-black/20 p-1 rounded-xl border border-white/5 overflow-x-auto max-w-full">
+                        {['1D', '1W', '1M', '6M', '1Y'].map((r) => (
+                            <button key={r} onClick={() => setRange(r)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap ${range === r ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>
+                                {r}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="h-64 w-full -ml-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={trendChartData} barGap={4}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} dy={10} interval={range === '1M' ? 2 : 0} />
+                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} tickFormatter={(val) => `₹${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`} />
+                            <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)', radius: 4}} content={<CustomTooltip />} />
+                            <Bar dataKey="income" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={20} />
+                            <Bar dataKey="expense" name="Expense" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={20} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default StatsPage;
