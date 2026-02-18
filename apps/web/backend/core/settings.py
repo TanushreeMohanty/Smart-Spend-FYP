@@ -80,10 +80,7 @@ REST_FRAMEWORK = {
     'COERCE_DECIMAL_TO_STRING': False, 
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+CORS_ALLOW_ALL_ORIGINS = True
 
 # 6. DATABASE & PATHS
 ROOT_URLCONF = 'core.urls'
