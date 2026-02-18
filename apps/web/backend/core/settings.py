@@ -130,3 +130,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Extra API Keys
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+
+CORS_ALLOW_CREDENTIALS = True
