@@ -1,12 +1,20 @@
-from django.urls import path
+from django.contrib import admin
+from django.urls import path,include
 from django.http import JsonResponse
 
-def temp_test_view(request):
-    return JsonResponse({"message": "Finance app is working :)"})
-
 urlpatterns = [
-    path('test/', temp_test_view),
+    path('admin/', admin.site.urls),
+    path('api/finance/', include('finance.urls')), # This "consumes" the first part of the URL
 ]
+
+# def temp_test_view(request):
+#     return JsonResponse({"message": "Finance app is working :)"})
+
+# urlpatterns = [
+#     path('test/', temp_test_view),
+# ]
+
+
 # # first check done
 # from django.contrib import admin
 # from django.urls import path, include

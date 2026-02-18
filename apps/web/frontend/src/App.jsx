@@ -1,24 +1,198 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from "react";
 
-function App() {
-  const [connection, setConnection] = useState("Testing...");
+// Context & Constants - Note: You'll eventually update useAuth to handle Django JWT
+import { TABS } from "../../../../packages/shared/config/constants";
+import { cn } from "../../../../packages/shared/utils/cn";
 
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/test/")
-      .then(response => response.json())
-      .then(data => setConnection(data.message))
-      .catch(error => setConnection("Connection Failed! Check CORS."));
+// UI Components
+import { Navigation } from "./components/ui/Navigation";
+import { Toast } from "./components/ui/Shared";
+
+export default function App() {
+  const API_BASE_URL = "http://127.0.0.1:8000/api/finance";
+
+  // --- 1. Pure Django Auth State ---
+  const [currentUser, setCurrentUser] = useState(null); // { id, username }
+  const [isSignup, setIsSignup] = useState(false);
+  const [authData, setAuthData] = useState({ username: "", password: "", email: "" });
+  
+  // --- 2. Local UI State ---
+  const [activeTab, setActiveTab] = useState(TABS.HOME);
+  const [toast, setToast] = useState({ show: false, msg: "", type: "info" });
+  const [theme] = useState(() => localStorage.getItem("app_theme") || "dark");
+
+  // --- 3. Data Testing State ---
+  const [testAmount, setTestAmount] = useState("");
+  const [testNote, setTestNote] = useState("");
+
+  const showToast = useCallback((msg, type = "info") => {
+    setToast({ show: true, msg, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
   }, []);
 
+  // --- 4. Auth Handlers (Signup / Login) ---
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    const endpoint = isSignup ? "/register/" : "/login/";
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(authData),
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        if (isSignup) {
+          showToast("Account created! Please login.", "success");
+          setIsSignup(false);
+        } else {
+          setCurrentUser({ id: data.user_id, username: data.username });
+          showToast(`Logged in as ${data.username}`, "success");
+        }
+      } else {
+        showToast(data.error || "Auth failed", "error");
+      }
+    } catch (err) {
+      showToast("Backend unreachable", "error");
+    }
+  };
+
+  // --- 5. Save Data Linked to Current User ---
+  const handleSaveData = async (e) => {
+    e.preventDefault();
+    if (!testAmount) return showToast("Enter an amount", "error");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/add-transaction/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: currentUser.id, // Direct ID linking
+          amount: testAmount,
+          note: testNote,
+        }),
+      });
+
+      if (response.ok) {
+        showToast("Saved to Django Admin!", "success");
+        setTestAmount("");
+        setTestNote("");
+      } else {
+        showToast("Failed to save", "error");
+      }
+    } catch (err) {
+      showToast("Network Error", "error");
+    }
+  };
+
+  // --- 6. Render Logic ---
   return (
-    <div>
-      <h1>Spendsy Frontend</h1>
-      <p>Backend Status: <strong>{connection}</strong></p>
+    <div className={cn(
+      "min-h-screen transition-colors duration-1000 font-sans pb-28 md:pb-0 md:pl-28", 
+      theme === "dark" ? "bg-[#08090a] text-white" : "bg-[#cfd9e5] text-slate-900"
+    )}>
+      
+      <Toast message={toast.msg} type={toast.type} isVisible={toast.show} onClose={() => setToast(p => ({ ...p, show: false }))} />
+
+      {currentUser && (
+        <Navigation activeTab={activeTab} setActiveTab={setActiveTab} onSignOut={() => setCurrentUser(null)} />
+      )}
+
+      <div className="mx-auto min-h-screen relative z-10 max-w-6xl px-12 flex flex-col items-center justify-center">
+        
+        {!currentUser ? (
+          /* LOGIN / SIGNUP CARD */
+          <div className="bg-white/5 border border-white/10 p-10 rounded-[2.5rem] w-full max-w-md backdrop-blur-xl">
+            <h2 className="text-3xl font-black mb-6">{isSignup ? "Create Account" : "Welcome Back"}</h2>
+            <form onSubmit={handleAuth} className="flex flex-col gap-4">
+              <input 
+                placeholder="Username" 
+                className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
+                onChange={e => setAuthData({...authData, username: e.target.value})} 
+              />
+              {isSignup && (
+                <input 
+                  placeholder="Email" 
+                  className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
+                  onChange={e => setAuthData({...authData, email: e.target.value})} 
+                />
+              )}
+              <input 
+                type="password" 
+                placeholder="Password" 
+                className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
+                onChange={e => setAuthData({...authData, password: e.target.value})} 
+              />
+              <button className="bg-blue-600 py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all mt-2">
+                {isSignup ? "Sign Up" : "Login"}
+              </button>
+            </form>
+            <button 
+              onClick={() => setIsSignup(!isSignup)} 
+              className="mt-6 text-sm opacity-60 hover:opacity-100 transition-opacity w-full text-center"
+            >
+              {isSignup ? "Already have an account? Login" : "Need an account? Create one"}
+            </button>
+          </div>
+        ) : (
+          /* LOGGED IN CONTENT */
+          <div className="w-full">
+            <header className="mb-10 text-left w-full">
+              <h1 className="text-5xl font-black mb-2">Hello, {currentUser.username}</h1>
+              <p className="opacity-50 text-lg">Django ID: {currentUser.id} • Status: Connected</p>
+            </header>
+
+            <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] max-w-md backdrop-blur-xl">
+              <h2 className="text-xl font-bold mb-6">Test Django Persistence</h2>
+              <form onSubmit={handleSaveData} className="flex flex-col gap-4">
+                <input 
+                  type="number" 
+                  placeholder="Amount (₹)" 
+                  value={testAmount}
+                  onChange={(e) => setTestAmount(e.target.value)}
+                  className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
+                />
+                <input 
+                  type="text" 
+                  placeholder="Note (e.g. Test Entry)" 
+                  value={testNote}
+                  onChange={(e) => setTestNote(e.target.value)}
+                  className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
+                />
+                <button type="submit" className="bg-emerald-600 py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all">
+                  Save to Django Admin
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+// import React, { useEffect, useState } from 'react';
 
-export default App;
+// function App() {
+//   const [connection, setConnection] = useState("Testing...");
+
+//   useEffect(() => {
+//     fetch("http://127.0.0.1:8000/test/")
+//       .then(response => response.json())
+//       .then(data => setConnection(data.message))
+//       .catch(error => setConnection("Connection Failed! Check CORS."));
+//   }, []);
+
+//   return (
+//     <div>
+//       <h1>Spendsy Frontend</h1>
+//       <p>Backend Status: <strong>{connection}</strong></p>
+//     </div>
+//   );
+// }
+
+// export default App;
 
 // //Actual code for spendsy -------------------------------------------------------------
 // import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -59,11 +233,9 @@ export default App;
 // import ProfilePage from "./pages/ProfilePage"; // Section 7
 // import ITRPage from "./pages/ITRPage"; // ITR Wizard
 
-
 // export default function App() {
 
 // const API_BASE_URL = "http://127.0.0.1:8000/api";
-
 
 //   // --- 1. Global State (Original Logic) ---
 //   const {
@@ -139,7 +311,7 @@ export default App;
 //         showToast("Backend connection failed", "error");
 //       }
 //     };
-    
+
 //     if (user) checkBackend();
 //   }, [user, showToast]);
 
@@ -169,10 +341,10 @@ export default App;
 //     }
 
 //     // 3. ONBOARDING WIZARD TRIGGER
-//     // Logic: Only show if user is fully logged in, not a guest, 
+//     // Logic: Only show if user is fully logged in, not a guest,
 //     // and Django profile data shows no income.
 //     const incomeValue = parseFloat(settings?.monthlyIncome || 0);
-    
+
 //     if (user && !isGuest && settings && incomeValue === 0) {
 //       const timer = setTimeout(() => {
 //         setShowWizard(true);
@@ -247,9 +419,9 @@ export default App;
 //     };
 
 //     await updateSettings(payload);
-    
+
 //     // FIX: Match this name exactly to your useState at the top of App.jsx
-//     setShowWizard(false); 
+//     setShowWizard(false);
 //   } catch (error) {
 //     console.error("Save failed:", error);
 //   }
@@ -463,7 +635,7 @@ export default App;
 //     <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500/10 blur-[80px] rounded-full pointer-events-none" />
 
 //     <div className="relative z-10">
-      
+
 //       {/* 1. Header Label */}
 //       <div className="flex items-center gap-2 mb-4 sm:mb-6 opacity-50">
 //         <LayoutIcon className="w-4 h-4" />
@@ -483,9 +655,9 @@ export default App;
 //         // Length > 13 (e.g. ₹10,00,000.00) -> text-2xl
 //         // Length > 9  (e.g. ₹1,00,000)    -> text-3xl
 //         // Short       (e.g. ₹5,000)       -> text-4xl
-//         const mobileFontSize = 
-//           displayValue.length > 13 ? "text-2xl" : 
-//           displayValue.length > 9 ? "text-3xl" : 
+//         const mobileFontSize =
+//           displayValue.length > 13 ? "text-2xl" :
+//           displayValue.length > 9 ? "text-3xl" :
 //           "text-4xl";
 
 //         return (
@@ -493,7 +665,7 @@ export default App;
 //             className={cn(
 //               "font-black mb-8 sm:mb-10 tracking-tighter leading-tight tabular-nums bg-clip-text text-transparent bg-gradient-to-r",
 //               // Apply dynamic mobile font size, force text-7xl on desktop
-//               `${mobileFontSize} sm:text-6xl md:text-7xl`, 
+//               `${mobileFontSize} sm:text-6xl md:text-7xl`,
 //               theme === "dark"
 //                 ? "from-white via-white to-white/70"
 //                 : "from-slate-900 via-slate-800 to-slate-600"
@@ -506,7 +678,7 @@ export default App;
 
 //       {/* 3. Stats Grid */}
 //       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
-        
+
 //         {/* Income Tile */}
 //         <div
 //           className={cn(
@@ -577,7 +749,6 @@ export default App;
 //               : "pt-8",
 //           )}
 //         >
-
 
 //           <AnimatePresence mode="wait">
 //           {/* <AnimatePresence mode="wait"> */}

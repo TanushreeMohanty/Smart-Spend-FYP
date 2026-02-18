@@ -2,8 +2,20 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # path('some-endpoint/', views.some_view, name='some-view'),
+    # Health check for testing connection
+    path('test/', views.health_check, name='health_check'),
+    
+    # Auth endpoints
+    path('register/', views.register_user, name='register'),
+    path('login/', views.login_user, name='login'),
+    
+    # Data endpoints
+    path('add-transaction/', views.add_transaction, name='add_transaction'),
+    
+    # ADD THIS: To stop the 404 in your DataContext.jsx
+    # path('transactions/', views.get_transactions, name='get_transactions'),
 ]
+
 
 # # first check done
 # from django.urls import path, include
