@@ -23,6 +23,7 @@ import WelcomeWizard from "./components/onboarding/WelcomeWizard";
 import LoginScreen from "./pages/LoginScreen";
 import HomePage from "./pages/HomePage";
 import HistoryPage from "./pages/HistoryPage";
+import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
   const API_BASE_URL = "http://127.0.0.1:8000/api/finance";
@@ -88,7 +89,6 @@ export default function App() {
   const displayName = currentUser?.username
     ? currentUser.username.split(" ")[0]
     : "Guest";
-
   // Inside your main React component
 
   const fetchHistory = async () => {
@@ -101,8 +101,22 @@ export default function App() {
     setTransactions(data);
   };
 
+  const fetchSettings = async () => {
+  if (!currentUser?.id) return;
+  try {
+    const response = await fetch(`${API_BASE_URL}/profile/${currentUser.id}/`);
+    const data = await response.json();
+    if (response.ok) {
+      setSettings(data); // This fills your Profile & Wizard state
+    }
+  } catch (err) {
+    console.error("Failed to load settings:", err);
+  }
+};
+
   useEffect(() => {
     fetchHistory();
+    fetchSettings(); // <--- ADD THIS LINE
   }, [currentUser?.id]); // Change 'user' to 'currentUser'
 
   // --- 3. UI HELPERS ---
@@ -142,21 +156,24 @@ export default function App() {
   };
 
   // --- 4. ACTION HANDLERS ---
-const deleteTransaction = async (id) => {
+  const deleteTransaction = async (id) => {
     try {
-        // Ensure there's a slash after the ID if your Django URL has one
-        const response = await fetch(`http://127.0.0.1:8000/api/finance/delete-transaction/${id}/`, {
-            method: 'DELETE',
-        });
+      // Ensure there's a slash after the ID if your Django URL has one
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/finance/delete-transaction/${id}/`,
+        {
+          method: "DELETE",
+        },
+      );
 
-        if (response.ok) {
-            // Update your local state so the UI refreshes
-            setTransactions(prev => prev.filter(t => t.id !== id));
-        }
+      if (response.ok) {
+        // Update your local state so the UI refreshes
+        setTransactions((prev) => prev.filter((t) => t.id !== id));
+      }
     } catch (error) {
-        console.error("Delete failed:", error);
+      console.error("Delete failed:", error);
     }
-};
+  };
 
   const updateTransaction = async (updatedTx) => {
     try {
@@ -191,30 +208,30 @@ const deleteTransaction = async (id) => {
     showToast("Bulk delete successful", "success");
   };
 
-  const handleWizardComplete = async (wizardData) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/update-settings/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: currentUser.id,
-          monthly_income: wizardData.monthlyIncome,
-          monthly_budget: wizardData.budgetLimit,
-          is_business: wizardData.isBusiness,
-        }),
-      });
-      if (response.ok) {
-        showToast("Profile set up successfully!", "success");
-        setSettings({
-          monthlyBudget: wizardData.budgetLimit,
-          monthlyIncome: wizardData.monthlyIncome,
-        });
-        setShowWizard(false);
-      }
-    } catch (err) {
-      showToast("Server unreachable", "error");
-    }
-  };
+  // const handleWizardComplete = async (wizardData) => {
+  //   try {
+  //     const response = await fetch(`${API_BASE_URL}/update-settings/`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         user_id: currentUser.id, // Good
+  //         monthlyIncome: wizardData.monthlyIncome, // Changed from monthly_income
+  //         monthlyBudget: wizardData.budgetLimit, // Changed from monthly_budget
+  //         is_business: wizardData.isBusiness, // matches backend
+  //       }),
+  //     });
+  //     if (response.ok) {
+  //       showToast("Profile set up successfully!", "success");
+  //       setSettings({
+  //         monthlyBudget: wizardData.budgetLimit,
+  //         monthlyIncome: wizardData.monthlyIncome,
+  //       });
+  //       setShowWizard(false);
+  //     }
+  //   } catch (err) {
+  //     showToast("Server unreachable", "error");
+  //   }
+  // };
 
   const requestDeleteTransaction = (id) =>
     triggerConfirm("Permanently delete?", () => deleteTransaction(id));
@@ -223,6 +240,64 @@ const deleteTransaction = async (id) => {
       bulkDeleteTransactions(items),
     );
 
+  // const updateProfileSettings = async (localSettings) => {
+  //   try {
+  //     const response = await fetch(
+  //       `${API_BASE_URL}/profile/${currentUser.id}/`,
+  //       {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         // localSettings already contains monthlyIncome, monthlyBudget, etc.
+  //         body: JSON.stringify(localSettings),
+  //       },
+  //     );
+
+  //     if (!response.ok) {
+  //       const errorData = await response.json();
+  //       throw new Error(errorData.error || "Update failed");
+  //     }
+
+  //     const data = await response.json();
+  //     setSettings(data.settings); // Update global state with saved data
+  //     showToast("Profile Saved!", "success");
+  //   } catch (err) {
+  //     console.error("Save Error:", err);
+  //     showToast(err.message, "error");
+  //   }
+  // };
+
+  // --- 4. ACTION HANDLERS ---
+
+  const saveSettings = async (dataToSave) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/profile/${currentUser.id}/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dataToSave),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Update failed");
+      }
+
+      const data = await response.json();
+      // data.settings comes back from Django with the latest floats
+      setSettings(data.settings); 
+      showToast("Settings saved!", "success");
+      return true; 
+    } catch (err) {
+      console.error("Save Error:", err);
+      showToast(err.message, "error");
+      return false;
+    }
+  };
+
+  // Now, your specific handlers just call the master function above:
+  const handleWizardComplete = async (wizardData) => {
+    const success = await saveSettings(wizardData);
+    if (success) setShowWizard(false);
+  };
   // --- 5. AUTH GUARD ---
   if (!currentUser) {
     return <LoginScreen onAuthSuccess={setCurrentUser} showToast={showToast} />;
@@ -279,12 +354,12 @@ const deleteTransaction = async (id) => {
                 <Moon className="w-5 h-5 text-blue-600" />
               )}
             </button>
-            <button
+            {/* <button
               onClick={() => setShowWizard(true)}
               className="px-6 py-4 rounded-2xl bg-blue-600 font-bold hover:bg-blue-700 transition-all"
             >
               Setup Profile
-            </button>
+            </button> */}
           </div>
         </header>
 
@@ -398,9 +473,19 @@ const deleteTransaction = async (id) => {
                   onSuccess={fetchHistory} // Pass the refresh function here
                 />
               )}
+              {activeTab === TABS.PROFILE && (
+                <ProfilePage
+                  user={currentUser}
+                  settings={settings}
+                  onUpdateSettings={saveSettings}
+                  onSignOut={() => setCurrentUser(null)}
+                  triggerConfirm={triggerConfirm}
+                />
+              )}
               {activeTab !== TABS.HOME &&
                 activeTab !== TABS.HISTORY &&
-                activeTab !== TABS.ADD && (
+                activeTab !== TABS.ADD &&
+                activeTab !== TABS.PROFILE && (
                   <div className="text-center py-20 opacity-40 italic">
                     {activeTab} Page is under construction.
                   </div>
