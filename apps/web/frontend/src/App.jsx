@@ -1,56 +1,73 @@
-import React, { useState, useCallback } from "react";
-import { TABS } from "../../../../packages/shared/config/constants";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { TABS, APP_VERSION } from "../../../../packages/shared/config/constants";
 import { cn } from "../../../../packages/shared/utils/cn";
+import { motion, AnimatePresence } from "framer-motion";
+import { Zap, Sun, Moon, Pin, PinOff } from "lucide-react";
 
 // Components
 import { Navigation } from "./components/ui/Navigation";
-import { Toast } from "./components/ui/Shared";
-import LoginScreen from "./pages/LoginScreen"; // Login Screen (UPDATED)
+import { Toast, Loading } from "./components/ui/Shared";
+import WelcomeWizard from "./components/onboarding/WelcomeWizard";
+import LoginScreen from "./pages/LoginScreen";
 
 export default function App() {
   const API_BASE_URL = "http://127.0.0.1:8000/api/finance";
 
-  // State
+  // --- 1. State ---
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState(TABS.HOME);
   const [toast, setToast] = useState({ show: false, msg: "", type: "info" });
-  const [theme] = useState(() => localStorage.getItem("app_theme") || "dark");
-  const [testAmount, setTestAmount] = useState("");
-  const [testNote, setTestNote] = useState("");
+  const [theme, setTheme] = useState(() => localStorage.getItem("app_theme") || "dark");
+  const [showWizard, setShowWizard] = useState(false);
+  const [isHeaderPinned, setIsHeaderPinned] = useState(true);
 
+  // --- 2. Helpers ---
   const showToast = useCallback((msg, type = "info") => {
     setToast({ show: true, msg, type });
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
   }, []);
 
-  const handleSaveData = async (e) => {
-    e.preventDefault();
-    if (!testAmount) return showToast("Enter an amount", "error");
+  const toggleTheme = () => {
+    const newTheme = theme === "dark" ? "light" : "dark";
+    setTheme(newTheme);
+    localStorage.setItem("app_theme", newTheme);
+  };
 
+  // --- 3. Wizard Completion (Save to Django) ---
+  const handleWizardComplete = async (wizardData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/add-transaction/`, {
+      const response = await fetch(`${API_BASE_URL}/update-settings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: currentUser.id,
-          amount: testAmount,
-          note: testNote,
+          monthly_income: wizardData.monthlyIncome,
+          monthly_budget: wizardData.budgetLimit,
+          is_business: wizardData.isBusiness,
         }),
       });
 
       if (response.ok) {
-        showToast("Saved to Django Admin!", "success");
-        setTestAmount("");
-        setTestNote("");
+        showToast("Profile set up successfully!", "success");
+        setShowWizard(false);
       } else {
-        showToast("Failed to save", "error");
+        showToast("Failed to save profile", "error");
       }
     } catch (err) {
-      showToast("Network Error", "error");
+      showToast("Server unreachable", "error");
     }
   };
 
-  // If user is not logged in, show the LoginScreen
+  // --- 4. Auto-trigger Wizard for new users ---
+  useEffect(() => {
+    if (currentUser) {
+      // Logic: If user is logged in, you can check if they need onboarding
+      // For now, we'll let you trigger it or check a 'first_login' flag from Django
+      // setShowWizard(true); 
+    }
+  }, [currentUser]);
+
+  // If user is not logged in, show Login
   if (!currentUser) {
     return <LoginScreen onAuthSuccess={setCurrentUser} showToast={showToast} />;
   }
@@ -61,75 +78,54 @@ export default function App() {
       theme === "dark" ? "bg-[#08090a] text-white" : "bg-[#cfd9e5] text-slate-900"
     )}>
       
-      <Toast 
-        message={toast.msg} 
-        type={toast.type} 
-        isVisible={toast.show} 
-        onClose={() => setToast(p => ({ ...p, show: false }))} 
-      />
+      {/* Background Decor */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#3b82f6,transparent_75%)] opacity-10 blur-[120px]" />
+      </div>
 
-      <Navigation 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        onSignOut={() => setCurrentUser(null)} 
-      />
+      <Toast message={toast.msg} type={toast.type} isVisible={toast.show} onClose={() => setToast(p => ({ ...p, show: false }))} />
+      
+      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} onSignOut={() => setCurrentUser(null)} />
 
-      <div className="mx-auto min-h-screen relative z-10 max-w-6xl px-12 flex flex-col items-center justify-center">
-        <div className="w-full">
-          <header className="mb-10 text-left w-full">
-            <h1 className="text-5xl font-black mb-2">Hello, {currentUser.username}</h1>
-            <p className="opacity-50 text-lg">Django ID: {currentUser.id} • Status: Connected</p>
-          </header>
+      {/* Welcome Wizard Modal */}
+      <WelcomeWizard isOpen={showWizard} onComplete={handleWizardComplete} />
 
-          <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] max-w-md backdrop-blur-xl">
-            <h2 className="text-xl font-bold mb-6">Test Django Persistence</h2>
-            <form onSubmit={handleSaveData} className="flex flex-col gap-4">
-              <input 
-                type="number" 
-                placeholder="Amount (₹)" 
-                value={testAmount}
-                onChange={(e) => setTestAmount(e.target.value)}
-                className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
-              />
-              <input 
-                type="text" 
-                placeholder="Note (e.g. Test Entry)" 
-                value={testNote}
-                onChange={(e) => setTestNote(e.target.value)}
-                className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
-              />
-              <button type="submit" className="bg-emerald-600 py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all">
-                Save to Django Admin
-              </button>
-            </form>
+      <div className="mx-auto min-h-screen relative z-10 max-w-6xl px-12 flex flex-col">
+        
+        {/* Header Section */}
+        <header className="pt-10 mb-8 flex justify-between items-end">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-4 h-4 text-blue-500 fill-blue-500" />
+              <span className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-60">Spendsy</span>
+            </div>
+            <h1 className="text-5xl font-black">Hello, {currentUser.username.split(' ')[0]}</h1>
           </div>
-        </div>
+          
+          <div className="flex gap-3">
+            <button onClick={toggleTheme} className="p-4 rounded-full bg-white/5 border border-white/10">
+              {theme === "dark" ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-blue-600" />}
+            </button>
+            <button onClick={() => setShowWizard(true)} className="px-6 py-4 rounded-2xl bg-blue-600 font-bold hover:bg-blue-700 transition-all">
+              Setup Profile
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 flex flex-col items-center justify-center">
+             {/* Content based on Active Tab goes here */}
+             <div className="text-center opacity-40 italic">
+                Select a tab from the sidebar to begin managing your finance.
+             </div>
+        </main>
+
+        <footer className="py-10 text-center opacity-40 text-xs font-mono tracking-widest uppercase">
+          {APP_VERSION} • &copy; {new Date().getFullYear()} Spendsy
+        </footer>
       </div>
     </div>
   );
 }
-
-// import React, { useEffect, useState } from 'react';
-
-// function App() {
-//   const [connection, setConnection] = useState("Testing...");
-
-//   useEffect(() => {
-//     fetch("http://127.0.0.1:8000/test/")
-//       .then(response => response.json())
-//       .then(data => setConnection(data.message))
-//       .catch(error => setConnection("Connection Failed! Check CORS."));
-//   }, []);
-
-//   return (
-//     <div>
-//       <h1>Spendsy Frontend</h1>
-//       <p>Backend Status: <strong>{connection}</strong></p>
-//     </div>
-//   );
-// }
-
-// export default App;
 
 // //Actual code for spendsy -------------------------------------------------------------
 // import React, { useState, useEffect, useMemo, useCallback } from "react";

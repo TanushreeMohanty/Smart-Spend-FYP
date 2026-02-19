@@ -88,7 +88,14 @@ A comprehensive Personal Finance PWA tailored for the Indian market, featuring A
 - 3. Click it, write a short title, and click Create Pull Request to notify the Owner and Do not click on any merge button.
 
 
+## Codes to run
 
+For backend:
+```bash
+python manage.py makemigrations
+python manage.py migrate
+python manage.py runserver
+```
 
 
 
