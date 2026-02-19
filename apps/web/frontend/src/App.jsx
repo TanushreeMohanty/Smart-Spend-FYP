@@ -1,27 +1,20 @@
 import React, { useState, useCallback } from "react";
-
-// Context & Constants - Note: You'll eventually update useAuth to handle Django JWT
 import { TABS } from "../../../../packages/shared/config/constants";
 import { cn } from "../../../../packages/shared/utils/cn";
 
-// UI Components
+// Components
 import { Navigation } from "./components/ui/Navigation";
 import { Toast } from "./components/ui/Shared";
+import LoginScreen from "./pages/LoginScreen"; // Login Screen (UPDATED)
 
 export default function App() {
   const API_BASE_URL = "http://127.0.0.1:8000/api/finance";
 
-  // --- 1. Pure Django Auth State ---
-  const [currentUser, setCurrentUser] = useState(null); // { id, username }
-  const [isSignup, setIsSignup] = useState(false);
-  const [authData, setAuthData] = useState({ username: "", password: "", email: "" });
-  
-  // --- 2. Local UI State ---
+  // State
+  const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState(TABS.HOME);
   const [toast, setToast] = useState({ show: false, msg: "", type: "info" });
   const [theme] = useState(() => localStorage.getItem("app_theme") || "dark");
-
-  // --- 3. Data Testing State ---
   const [testAmount, setTestAmount] = useState("");
   const [testNote, setTestNote] = useState("");
 
@@ -30,36 +23,6 @@ export default function App() {
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
   }, []);
 
-  // --- 4. Auth Handlers (Signup / Login) ---
-  const handleAuth = async (e) => {
-    e.preventDefault();
-    const endpoint = isSignup ? "/register/" : "/login/";
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(authData),
-      });
-      const data = await response.json();
-
-      if (response.ok) {
-        if (isSignup) {
-          showToast("Account created! Please login.", "success");
-          setIsSignup(false);
-        } else {
-          setCurrentUser({ id: data.user_id, username: data.username });
-          showToast(`Logged in as ${data.username}`, "success");
-        }
-      } else {
-        showToast(data.error || "Auth failed", "error");
-      }
-    } catch (err) {
-      showToast("Backend unreachable", "error");
-    }
-  };
-
-  // --- 5. Save Data Linked to Current User ---
   const handleSaveData = async (e) => {
     e.preventDefault();
     if (!testAmount) return showToast("Enter an amount", "error");
@@ -69,7 +32,7 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: currentUser.id, // Direct ID linking
+          user_id: currentUser.id,
           amount: testAmount,
           note: testNote,
         }),
@@ -87,91 +50,65 @@ export default function App() {
     }
   };
 
-  // --- 6. Render Logic ---
+  // If user is not logged in, show the LoginScreen
+  if (!currentUser) {
+    return <LoginScreen onAuthSuccess={setCurrentUser} showToast={showToast} />;
+  }
+
   return (
     <div className={cn(
       "min-h-screen transition-colors duration-1000 font-sans pb-28 md:pb-0 md:pl-28", 
       theme === "dark" ? "bg-[#08090a] text-white" : "bg-[#cfd9e5] text-slate-900"
     )}>
       
-      <Toast message={toast.msg} type={toast.type} isVisible={toast.show} onClose={() => setToast(p => ({ ...p, show: false }))} />
+      <Toast 
+        message={toast.msg} 
+        type={toast.type} 
+        isVisible={toast.show} 
+        onClose={() => setToast(p => ({ ...p, show: false }))} 
+      />
 
-      {currentUser && (
-        <Navigation activeTab={activeTab} setActiveTab={setActiveTab} onSignOut={() => setCurrentUser(null)} />
-      )}
+      <Navigation 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        onSignOut={() => setCurrentUser(null)} 
+      />
 
       <div className="mx-auto min-h-screen relative z-10 max-w-6xl px-12 flex flex-col items-center justify-center">
-        
-        {!currentUser ? (
-          /* LOGIN / SIGNUP CARD */
-          <div className="bg-white/5 border border-white/10 p-10 rounded-[2.5rem] w-full max-w-md backdrop-blur-xl">
-            <h2 className="text-3xl font-black mb-6">{isSignup ? "Create Account" : "Welcome Back"}</h2>
-            <form onSubmit={handleAuth} className="flex flex-col gap-4">
+        <div className="w-full">
+          <header className="mb-10 text-left w-full">
+            <h1 className="text-5xl font-black mb-2">Hello, {currentUser.username}</h1>
+            <p className="opacity-50 text-lg">Django ID: {currentUser.id} • Status: Connected</p>
+          </header>
+
+          <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] max-w-md backdrop-blur-xl">
+            <h2 className="text-xl font-bold mb-6">Test Django Persistence</h2>
+            <form onSubmit={handleSaveData} className="flex flex-col gap-4">
               <input 
-                placeholder="Username" 
+                type="number" 
+                placeholder="Amount (₹)" 
+                value={testAmount}
+                onChange={(e) => setTestAmount(e.target.value)}
                 className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
-                onChange={e => setAuthData({...authData, username: e.target.value})} 
               />
-              {isSignup && (
-                <input 
-                  placeholder="Email" 
-                  className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
-                  onChange={e => setAuthData({...authData, email: e.target.value})} 
-                />
-              )}
               <input 
-                type="password" 
-                placeholder="Password" 
+                type="text" 
+                placeholder="Note (e.g. Test Entry)" 
+                value={testNote}
+                onChange={(e) => setTestNote(e.target.value)}
                 className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
-                onChange={e => setAuthData({...authData, password: e.target.value})} 
               />
-              <button className="bg-blue-600 py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all mt-2">
-                {isSignup ? "Sign Up" : "Login"}
+              <button type="submit" className="bg-emerald-600 py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all">
+                Save to Django Admin
               </button>
             </form>
-            <button 
-              onClick={() => setIsSignup(!isSignup)} 
-              className="mt-6 text-sm opacity-60 hover:opacity-100 transition-opacity w-full text-center"
-            >
-              {isSignup ? "Already have an account? Login" : "Need an account? Create one"}
-            </button>
           </div>
-        ) : (
-          /* LOGGED IN CONTENT */
-          <div className="w-full">
-            <header className="mb-10 text-left w-full">
-              <h1 className="text-5xl font-black mb-2">Hello, {currentUser.username}</h1>
-              <p className="opacity-50 text-lg">Django ID: {currentUser.id} • Status: Connected</p>
-            </header>
-
-            <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] max-w-md backdrop-blur-xl">
-              <h2 className="text-xl font-bold mb-6">Test Django Persistence</h2>
-              <form onSubmit={handleSaveData} className="flex flex-col gap-4">
-                <input 
-                  type="number" 
-                  placeholder="Amount (₹)" 
-                  value={testAmount}
-                  onChange={(e) => setTestAmount(e.target.value)}
-                  className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
-                />
-                <input 
-                  type="text" 
-                  placeholder="Note (e.g. Test Entry)" 
-                  value={testNote}
-                  onChange={(e) => setTestNote(e.target.value)}
-                  className="bg-black/20 border border-white/10 p-4 rounded-2xl focus:border-blue-500 outline-none"
-                />
-                <button type="submit" className="bg-emerald-600 py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all">
-                  Save to Django Admin
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
 }
+
 // import React, { useEffect, useState } from 'react';
 
 // function App() {
