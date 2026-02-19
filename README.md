@@ -100,7 +100,7 @@ python manage.py runserver
 
 
 
-
+give code to add addpage in app.jsx and when i will ask django code give it 
 
 
 

@@ -1,30 +1,97 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { TABS, APP_VERSION } from "../../../../packages/shared/config/constants";
+// ==========================================
+// START OF CODE: App.jsx
+// ==========================================
+
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  TABS,
+  APP_VERSION,
+} from "../../../../packages/shared/config/constants";
 import { cn } from "../../../../packages/shared/utils/cn";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Sun, Moon, Pin, PinOff } from "lucide-react";
+import { Zap, Sun, Moon, ArrowDown, ArrowUp } from "lucide-react";
+import { formatIndianCompact } from "../../../../packages/shared/utils/helpers";
+import AddPage from "./pages/AddPage";
+import { Pin, PinOff, Layout as LayoutIcon } from "lucide-react"; // Ensure these are in your lucide-react import
 
 // Components
 import { Navigation } from "./components/ui/Navigation";
-import { Toast, Loading } from "./components/ui/Shared";
+import { Toast, ConfirmationDialog } from "./components/ui/Shared";
 import WelcomeWizard from "./components/onboarding/WelcomeWizard";
+
+// Pages
 import LoginScreen from "./pages/LoginScreen";
+import HomePage from "./pages/HomePage";
+import HistoryPage from "./pages/HistoryPage";
 
 export default function App() {
   const API_BASE_URL = "http://127.0.0.1:8000/api/finance";
 
-  // --- 1. State ---
+  // --- 1. STATE MANAGEMENT ---
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState(TABS.HOME);
   const [toast, setToast] = useState({ show: false, msg: "", type: "info" });
-  const [theme, setTheme] = useState(() => localStorage.getItem("app_theme") || "dark");
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("app_theme") || "dark",
+  );
   const [showWizard, setShowWizard] = useState(false);
-  const [isHeaderPinned, setIsHeaderPinned] = useState(true);
 
-  // --- 2. Helpers ---
+  // Data State (Note: If using useData() later, replace these state declarations)
+  const [transactions, setTransactions] = useState([]);
+  const [wealthItems, setWealthItems] = useState([]);
+  const [settings, setSettings] = useState({
+    monthlyBudget: 0,
+    monthlyIncome: 0,
+  });
+
+  //Add Transaction Modal State
+  const [isHeaderPinned, setIsHeaderPinned] = useState(
+    () => localStorage.getItem("smartSpend_header_pinned") === "true",
+  );
+  const [scrollOpacity, setScrollOpacity] = useState(1);
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    message: "",
+    action: null,
+  });
+
+  // --- 2. CALCULATIONS ---
+  const totals = useMemo(
+    () =>
+      transactions.reduce(
+        (acc, curr) => {
+          const amt = parseFloat(curr.amount || 0);
+          curr.type === "income" ? (acc.income += amt) : (acc.expenses += amt);
+          return acc;
+        },
+        { income: 0, expenses: 0 },
+      ),
+    [transactions],
+  );
+
+  const balance = totals.income - totals.expenses;
+  const netWorth = useMemo(
+    () =>
+      wealthItems.reduce(
+        (acc, curr) => {
+          const amt = parseFloat(curr.amount || 0);
+          if (curr.type === "asset") acc.assets += amt;
+          else acc.liabilities += amt;
+          return acc;
+        },
+        { assets: 0, liabilities: 0 },
+      ),
+    [wealthItems],
+  );
+
+  const displayName = currentUser?.username
+    ? currentUser.username.split(" ")[0]
+    : "Guest";
+
+  // --- 3. UI HELPERS ---
   const showToast = useCallback((msg, type = "info") => {
     setToast({ show: true, msg, type });
-    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3000);
   }, []);
 
   const toggleTheme = () => {
@@ -33,7 +100,44 @@ export default function App() {
     localStorage.setItem("app_theme", newTheme);
   };
 
-  // --- 3. Wizard Completion (Save to Django) ---
+  const togglePin = () => {
+    const newState = !isHeaderPinned;
+    setIsHeaderPinned(newState);
+    localStorage.setItem("smartSpend_header_pinned", newState);
+    if (newState) setScrollOpacity(1);
+  };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!isHeaderPinned)
+        setScrollOpacity(Math.max(0, 1 - window.scrollY / 150));
+      else setScrollOpacity(1);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isHeaderPinned]);
+
+  // Basic confirmation placeholder
+  const triggerConfirm = (message, onConfirm) => {
+    if (window.confirm(message)) {
+      onConfirm();
+    }
+  };
+
+  // --- 4. ACTION HANDLERS ---
+  const deleteTransaction = (id) => {
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    showToast("Transaction deleted", "success");
+  };
+
+  const updateTransaction = (tx) => console.log("Update:", tx);
+
+  const bulkDeleteTransactions = (items) => {
+    const idsToDelete = items.map((item) => item.id);
+    setTransactions((prev) => prev.filter((t) => !idsToDelete.includes(t.id)));
+    showToast("Bulk delete successful", "success");
+  };
+
   const handleWizardComplete = async (wizardData) => {
     try {
       const response = await fetch(`${API_BASE_URL}/update-settings/`, {
@@ -46,77 +150,207 @@ export default function App() {
           is_business: wizardData.isBusiness,
         }),
       });
-
       if (response.ok) {
         showToast("Profile set up successfully!", "success");
+        setSettings({
+          monthlyBudget: wizardData.budgetLimit,
+          monthlyIncome: wizardData.monthlyIncome,
+        });
         setShowWizard(false);
-      } else {
-        showToast("Failed to save profile", "error");
       }
     } catch (err) {
       showToast("Server unreachable", "error");
     }
   };
 
-  // --- 4. Auto-trigger Wizard for new users ---
-  useEffect(() => {
-    if (currentUser) {
-      // Logic: If user is logged in, you can check if they need onboarding
-      // For now, we'll let you trigger it or check a 'first_login' flag from Django
-      // setShowWizard(true); 
-    }
-  }, [currentUser]);
+  const requestDeleteTransaction = (id) =>
+    triggerConfirm("Permanently delete?", () => deleteTransaction(id));
+  const requestBulkDelete = (items) =>
+    triggerConfirm(`Delete ${items.length} items?`, () =>
+      bulkDeleteTransactions(items),
+    );
 
-  // If user is not logged in, show Login
+  // --- 5. AUTH GUARD ---
   if (!currentUser) {
     return <LoginScreen onAuthSuccess={setCurrentUser} showToast={showToast} />;
   }
 
   return (
-    <div className={cn(
-      "min-h-screen transition-colors duration-1000 font-sans pb-28 md:pb-0 md:pl-28", 
-      theme === "dark" ? "bg-[#08090a] text-white" : "bg-[#cfd9e5] text-slate-900"
-    )}>
-      
+    <div
+      className={cn(
+        "min-h-screen transition-colors duration-1000 font-sans pb-28 md:pb-0 md:pl-28",
+        theme === "dark"
+          ? "bg-[#08090a] text-white"
+          : "bg-[#cfd9e5] text-slate-900",
+      )}
+    >
       {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#3b82f6,transparent_75%)] opacity-10 blur-[120px]" />
       </div>
 
-      <Toast message={toast.msg} type={toast.type} isVisible={toast.show} onClose={() => setToast(p => ({ ...p, show: false }))} />
-      
-      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} onSignOut={() => setCurrentUser(null)} />
-
-      {/* Welcome Wizard Modal */}
+      <Toast
+        message={toast.msg}
+        type={toast.type}
+        isVisible={toast.show}
+        onClose={() => setToast((p) => ({ ...p, show: false }))}
+      />
+      <Navigation
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onSignOut={() => setCurrentUser(null)}
+      />
       <WelcomeWizard isOpen={showWizard} onComplete={handleWizardComplete} />
 
       <div className="mx-auto min-h-screen relative z-10 max-w-6xl px-12 flex flex-col">
-        
-        {/* Header Section */}
         <header className="pt-10 mb-8 flex justify-between items-end">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Zap className="w-4 h-4 text-blue-500 fill-blue-500" />
-              <span className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-60">Spendsy</span>
+              <span className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-60">
+                Spendsy
+              </span>
             </div>
-            <h1 className="text-5xl font-black">Hello, {currentUser.username.split(' ')[0]}</h1>
+            <h1 className="text-5xl font-black">
+              Hello, {currentUser.username?.split(" ")[0]}
+            </h1>
           </div>
-          
           <div className="flex gap-3">
-            <button onClick={toggleTheme} className="p-4 rounded-full bg-white/5 border border-white/10">
-              {theme === "dark" ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-blue-600" />}
+            <button
+              onClick={toggleTheme}
+              className="p-4 rounded-full bg-white/5 border border-white/10"
+            >
+              {theme === "dark" ? (
+                <Sun className="w-5 h-5 text-amber-400" />
+              ) : (
+                <Moon className="w-5 h-5 text-blue-600" />
+              )}
             </button>
-            <button onClick={() => setShowWizard(true)} className="px-6 py-4 rounded-2xl bg-blue-600 font-bold hover:bg-blue-700 transition-all">
+            <button
+              onClick={() => setShowWizard(true)}
+              className="px-6 py-4 rounded-2xl bg-blue-600 font-bold hover:bg-blue-700 transition-all"
+            >
               Setup Profile
             </button>
           </div>
         </header>
 
-        <main className="flex-1 flex flex-col items-center justify-center">
-             {/* Content based on Active Tab goes here */}
-             <div className="text-center opacity-40 italic">
-                Select a tab from the sidebar to begin managing your finance.
-             </div>
+        {/* 3. HERO CARD (Current Balance & Stats) */}
+        {[TABS.HOME, TABS.ADD, TABS.STATS, TABS.WEALTH].includes(activeTab) && (
+          <motion.div
+            whileHover={{ scale: 1.01, y: -2 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className={cn(
+              "relative overflow-hidden rounded-[2.5rem] p-10 mb-10 border transition-all duration-500",
+              theme === "dark"
+                ? "bg-gradient-to-br from-white/[0.08] to-white/[0.02] border-white/10 shadow-xl"
+                : "bg-gradient-to-br from-white to-slate-50 border-white/60 shadow-xl",
+            )}
+          >
+            <div className="relative z-10">
+              {/* Label */}
+              <div className="flex items-center gap-2 mb-4 opacity-50">
+                <LayoutIcon className="w-4 h-4" />
+                <p className="text-xs font-bold uppercase tracking-widest">
+                  {activeTab === TABS.WEALTH
+                    ? "Net Valuation"
+                    : "Total Balance"}
+                </p>
+              </div>
+
+              {/* Main Figure */}
+              <h2
+                className={cn(
+                  "font-black mb-10 tracking-tighter text-7xl leading-tight",
+                  theme === "dark" ? "text-white" : "text-slate-900",
+                )}
+              >
+                {activeTab === TABS.WEALTH
+                  ? formatIndianCompact(netWorth.assets - netWorth.liabilities)
+                  : `₹${balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
+              </h2>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Income / Assets Tile */}
+                <div className="p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20">
+                  <div className="flex items-center gap-2 mb-2 text-emerald-500">
+                    <ArrowDown className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase">
+                      {activeTab === TABS.WEALTH ? "Assets" : "Income"}
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold">
+                    {activeTab === TABS.WEALTH
+                      ? formatIndianCompact(netWorth.assets)
+                      : `₹${totals.income.toLocaleString("en-IN")}`}
+                  </p>
+                </div>
+
+                {/* Expense / Liabilities Tile */}
+                <div className="p-5 rounded-3xl bg-rose-500/10 border border-rose-500/20">
+                  <div className="flex items-center gap-2 mb-2 text-rose-500">
+                    <ArrowUp className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase">
+                      {activeTab === TABS.WEALTH ? "Liabilities" : "Expense"}
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold">
+                    {activeTab === TABS.WEALTH
+                      ? formatIndianCompact(netWorth.liabilities)
+                      : `₹${totals.expenses.toLocaleString("en-IN")}`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        <main className="flex-1">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {activeTab === TABS.HOME && (
+                <HomePage
+                  transactions={transactions}
+                  wealthItems={wealthItems}
+                  setActiveTab={setActiveTab}
+                  onDelete={requestDeleteTransaction}
+                  onUpdate={updateTransaction}
+                  settings={settings}
+                  theme={theme}
+                />
+              )}
+              {activeTab === TABS.HISTORY && (
+                <HistoryPage
+                  transactions={transactions}
+                  setActiveTab={setActiveTab}
+                  onDelete={requestDeleteTransaction}
+                  onBulkDelete={requestBulkDelete}
+                  onUpdate={updateTransaction}
+                />
+              )}
+              {activeTab === TABS.ADD && (
+                <AddPage
+                  user={currentUser}
+                  appId={settings?.appId} // or however you store appId
+                  setActiveTab={setActiveTab}
+                  showToast={showToast}
+                  triggerConfirm={triggerConfirm}
+                />
+              )}
+              {activeTab !== TABS.HOME && activeTab !== TABS.HISTORY && activeTab !== TABS.ADD && (
+                <div className="text-center py-20 opacity-40 italic">
+                  {activeTab} Page is under construction.
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
 
         <footer className="py-10 text-center opacity-40 text-xs font-mono tracking-widest uppercase">
@@ -127,38 +361,20 @@ export default function App() {
   );
 }
 
+// ==========================================
+// END OF CODE: App.jsx
+// ==========================================
+
 // //Actual code for spendsy -------------------------------------------------------------
-// import React, { useState, useEffect, useMemo, useCallback } from "react";
-// import {
-//   Pin,
-//   PinOff,
-//   ArrowUp,
-//   ArrowDown,
-//   Sun,
-//   Moon,
-//   Zap,
-//   Layout as LayoutIcon,
-// } from "lucide-react";
-// import { motion, AnimatePresence } from "framer-motion";
 
 // // Context (Logic preserved 100%)
 // import { useAuth } from "../../../../packages/shared/context/AuthContext";
 // import { useData } from "../../../../packages/shared/context/DataContext";
 
 // // Config & Utils
-// import { TABS, APP_VERSION } from "../../../../packages/shared/config/constants";
 // import { formatIndianCompact } from "../../../../packages/shared/utils/helpers";
-// import { cn } from "../../../../packages/shared/utils/cn";
-
-// // Components
-// import { Navigation } from "./components/ui/Navigation";
-// import { Toast, Loading, ConfirmationDialog } from "./components/ui/Shared";
-// import WelcomeWizard from "./components/onboarding/WelcomeWizard";
 
 // // Pages
-// import LoginScreen from "./pages/LoginScreen"; // Login Screen (UPDATED)
-// import HomePage from "./pages/HomePage"; // Section 1
-// import HistoryPage from "./pages/HistoryPage"; // Section 2
 // import AddPage from "./pages/AddPage"; // Section 3
 // import AuditPage from "./pages/AuditPage"; // Section 4
 // import StatsPage from "./pages/StatsPage"; // Section 5
@@ -167,8 +383,6 @@ export default function App() {
 // import ITRPage from "./pages/ITRPage"; // ITR Wizard
 
 // export default function App() {
-
-// const API_BASE_URL = "http://127.0.0.1:8000/api";
 
 //   // --- 1. Global State (Original Logic) ---
 //   const {
@@ -180,40 +394,18 @@ export default function App() {
 //     loginAsGuest,
 //     logout,
 //   } = useAuth();
-//   const {
-//     transactions,
-//     wealthItems,
-//     settings,
-//     taxProfile,
-//     appId,
-//     deleteTransaction,
-//     updateTransaction,
-//     bulkDeleteTransactions,
-//     updateSettings,
-//     updateTaxProfile,
-//   } = useData();
 
 //   // --- 2. Local UI State ---
-//   const [showWizard, setShowWizard] = useState(false);
-//   const [activeTab, setActiveTab] = useState(TABS.HOME);
 //   const [isHeaderPinned, setIsHeaderPinned] = useState(true);
 //   const [scrollOpacity, setScrollOpacity] = useState(1);
-//   const [toast, setToast] = useState({ show: false, msg: "", type: "info" });
 //   const [confirmModal, setConfirmModal] = useState({
 //     isOpen: false,
 //     message: "",
 //     action: null,
 //   });
-//   const [theme, setTheme] = useState(
-//     () => localStorage.getItem("app_theme") || "dark",
-//   );
 //   const layoutMode = "desktop-full"; // Force desktop view
 
 //   // --- 3. Helpers (Original Logic) ---
-//   const showToast = useCallback((msg, type = "info") => {
-//     setToast({ show: true, msg, type });
-//     setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3000);
-//   }, []);
 
 //   const triggerConfirm = useCallback((message, action) => {
 //     setConfirmModal({ isOpen: true, message, action });
@@ -225,12 +417,6 @@ export default function App() {
 //     if (confirmModal.action) confirmModal.action();
 //     closeConfirm();
 //   }, [confirmModal, closeConfirm]);
-
-//   const toggleTheme = () => {
-//     const newTheme = theme === "dark" ? "light" : "dark";
-//     setTheme(newTheme);
-//     localStorage.setItem("app_theme", newTheme);
-//   };
 
 //   // --- 4. Effects (Original Logic) ---
 //   useEffect(() => {
@@ -304,19 +490,6 @@ export default function App() {
 //   };
 
 //   // --- 5. Data Processing (Original Logic) ---
-//   const totals = useMemo(
-//     () =>
-//       transactions.reduce(
-//         (acc, curr) => {
-//           const amt = parseFloat(curr.amount || 0);
-//           if (curr.type === "income") acc.income += amt;
-//           else acc.expenses += amt;
-//           return acc;
-//         },
-//         { income: 0, expenses: 0 },
-//       ),
-//     [transactions],
-//   );
 
 //   const netWorth = useMemo(
 //     () =>
@@ -332,7 +505,6 @@ export default function App() {
 //     [wealthItems],
 //   );
 
-//   const balance = totals.income - totals.expenses;
 //   const displayName = user?.displayName
 //     ? user.displayName.split(" ")[0]
 //     : "Guest";
@@ -342,23 +514,6 @@ export default function App() {
 // // Inside your main App.jsx
 
 // // Locate this function around line 250
-// const handleWizardComplete = async (wizardData) => {
-//   try {
-//     const payload = {
-//       monthlyIncome: wizardData.monthlyIncome,
-//       monthlyBudget: wizardData.budgetLimit,
-//       isBusiness: wizardData.isBusiness,
-//       dailyBudget: Math.floor(wizardData.budgetLimit / 30)
-//     };
-
-//     await updateSettings(payload);
-
-//     // FIX: Match this name exactly to your useState at the top of App.jsx
-//     setShowWizard(false);
-//   } catch (error) {
-//     console.error("Save failed:", error);
-//   }
-// };
 
 //   const requestDeleteTransaction = (id) =>
 //     triggerConfirm("Permanently delete?", () => deleteTransaction(id));

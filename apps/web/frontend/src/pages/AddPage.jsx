@@ -1,12 +1,6 @@
 //Database needed
 // Section 3 Add New Page
 import React, { useState, useRef, useEffect } from "react";
-import {
-  writeBatch,
-  doc,
-  collection,
-  serverTimestamp,
-} from "firebase/firestore";
 import { motion, AnimatePresence } from "framer-motion"; // Added Framer Motion
 import {
   Loader2,
@@ -17,9 +11,11 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import { CATEGORIES, TABS } from "../../../../../packages/shared/config/constants";
+import {
+  CATEGORIES,
+  TABS,
+} from "../../../../../packages/shared/config/constants";
 import { LocalRepository } from "../../../../../packages/shared/services/localRepository";
-import { StorageService } from "../../../../../packages/shared/services/storageService";
 import { ParserService } from "../../../../../packages/shared/services/parserService";
 import { loadScript } from "../../../../../packages/shared/utils/helpers";
 import UnitSelector from "../components/domain/UnitSelector";
@@ -63,25 +59,61 @@ const AddPage = ({ user, appId, setActiveTab, showToast, triggerConfirm }) => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    const finalAmount = parseFloat(amount) * transUnit;
-    try {
-      await StorageService.saveTransaction(user.uid, {
-        amount: finalAmount,
-        description: desc,
-        category: cat,
-        type,
-        isRecurring,
-      });
-      showToast(isRecurring ? "Recurring bill added!" : "Added!", "success");
-      setAmount("");
-      setDesc("");
-      setTransUnit(1);
-      setIsRecurring(false);
-    } catch (e) {
-      showToast("Error saving", "error");
+    console.log("Current User Object:", user); // <--- Add this
+    console.log("Extracted ID:", user?.user_id || user?.id);
+
+    // 1. Validation: Ensure user is logged in
+    if (!user || (!user.user_id && !user.id)) {
+      showToast("Error: User session not found. Please re-login.", "error");
+      return;
     }
-    setIsSubmitting(false);
+
+    setIsSubmitting(true);
+
+    const finalAmount = parseFloat(amount) * transUnit;
+
+    // 2. Updated formData to match your Django view logic
+    const formData = {
+      user_id: user.user_id || user.id, // Sends the ID Django needs to find the user
+      title: desc, // Matches 'title' in models.py
+      amount: finalAmount,
+      type: type, // 'income' or 'expense'
+      category: cat, // Matches the slug/id of the category
+      is_recurring: isRecurring, // Note: Ensure this is added to models.py
+    };
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/finance/add-transaction/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // If you use Token Auth later: "Authorization": `Token ${user.token}`
+          },
+          body: JSON.stringify(formData),
+        },
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showToast(isRecurring ? "Recurring bill added!" : "Added!", "success");
+        // Clear form
+        setAmount("");
+        setDesc("");
+        setTransUnit(1);
+        setIsRecurring(false);
+      } else {
+        // Show the specific error message from Django if available
+        throw new Error(data.error || "Failed to save");
+      }
+    } catch (e) {
+      console.error("Submission Error:", e);
+      showToast(`Server Error: ${e.message}`, "error");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleFile = async (e) => {
@@ -90,7 +122,7 @@ const AddPage = ({ user, appId, setActiveTab, showToast, triggerConfirm }) => {
 
     if (f.name.toLowerCase().endsWith(".pdf") && !window.pdfjsLib) {
       await loadScript(
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
       );
       if (window.pdfjsLib)
         window.pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -124,7 +156,7 @@ const AddPage = ({ user, appId, setActiveTab, showToast, triggerConfirm }) => {
           setIsScanned(true);
           showToast("Scanning Image PDF...", "info");
           const ocrLines = await ParserService.performOCR(f, (p) =>
-            setOcrProgress(p)
+            setOcrProgress(p),
           );
           results = ParserService.processLines(ocrLines, "OCR");
         } else {
@@ -152,45 +184,39 @@ const AddPage = ({ user, appId, setActiveTab, showToast, triggerConfirm }) => {
 
   const handleSyncToCloud = () => {
     triggerConfirm(
-      `Sync ${draftTransactions.length} items to Cloud?`,
+      `Sync ${draftTransactions.length} items to your Database?`,
       async () => {
         setIsSubmitting(true);
         try {
-          const batch = writeBatch(db);
+          // Option A: Send items one by one (Easiest if backend isn't set for bulk)
+          const promises = draftTransactions.map((t) =>
+            fetch(`http://127.0.0.1:8000/api/finance/add-transaction/`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              // Inside draftTransactions.map((t) => ...)
+              body: JSON.stringify({
+                user_id: user.user_id || user.id,
+                title: t.description || t.title,
+                amount: t.amount,
+                type: t.type,
+                category: t.category || "other",
+                is_recurring: t.is_recurring || false, // Add this line
+              }),
+            }),
+          );
 
-          draftTransactions.forEach((t) => {
-            const docRef = doc(
-              collection(
-                db,
-                "artifacts",
-                appId,
-                "users",
-                user.uid,
-                "transactions"
-              )
-            );
+          await Promise.all(promises);
 
-            batch.set(docRef, {
-              ...t,
-              source: t.confidence < 80 ? "ocr" : "pdf",
-              verificationStatus: "verified",
-              mlReady: true,
-              createdAt: serverTimestamp(),
-            });
-          });
-
-          await batch.commit();
           await LocalRepository.clearDrafts();
           setDraftTransactions([]);
-          showToast("Synced to Cloud successfully!", "success");
+          showToast("Synced to Database successfully!", "success");
           setActiveTab(TABS.HOME);
         } catch (e) {
-          console.error(e);
-          showToast("Sync failed. Data saved locally.", "error");
+          showToast("Sync failed. Check server connection.", "error");
         } finally {
           setIsSubmitting(false);
         }
-      }
+      },
     );
   };
 
