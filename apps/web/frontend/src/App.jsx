@@ -56,18 +56,19 @@ export default function App() {
   });
 
   // --- 2. CALCULATIONS ---
-  const totals = useMemo(
-    () =>
-      transactions.reduce(
-        (acc, curr) => {
-          const amt = parseFloat(curr.amount || 0);
-          curr.type === "income" ? (acc.income += amt) : (acc.expenses += amt);
-          return acc;
-        },
-        { income: 0, expenses: 0 },
-      ),
-    [transactions],
-  );
+  const totals = useMemo(() => {
+    // Ensure transactions is ALWAYS an array before reducing
+    if (!Array.isArray(transactions)) return { income: 0, expenses: 0 };
+
+    return transactions.reduce(
+      (acc, curr) => {
+        const amt = parseFloat(curr.amount || 0);
+        curr.type === "income" ? (acc.income += amt) : (acc.expenses += amt);
+        return acc;
+      },
+      { income: 0, expenses: 0 },
+    );
+  }, [transactions]);
 
   const balance = totals.income - totals.expenses;
   const netWorth = useMemo(
@@ -87,6 +88,22 @@ export default function App() {
   const displayName = currentUser?.username
     ? currentUser.username.split(" ")[0]
     : "Guest";
+
+  // Inside your main React component
+
+  const fetchHistory = async () => {
+    if (!currentUser?.id) return; // Change 'user' to 'currentUser'
+
+    const response = await fetch(
+      `http://127.0.0.1:8000/api/finance/history/${currentUser.id}/`,
+    );
+    const data = await response.json();
+    setTransactions(data);
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, [currentUser?.id]); // Change 'user' to 'currentUser'
 
   // --- 3. UI HELPERS ---
   const showToast = useCallback((msg, type = "info") => {
@@ -125,13 +142,49 @@ export default function App() {
   };
 
   // --- 4. ACTION HANDLERS ---
-  const deleteTransaction = (id) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
-    showToast("Transaction deleted", "success");
+const deleteTransaction = async (id) => {
+    try {
+        // Ensure there's a slash after the ID if your Django URL has one
+        const response = await fetch(`http://127.0.0.1:8000/api/finance/delete-transaction/${id}/`, {
+            method: 'DELETE',
+        });
+
+        if (response.ok) {
+            // Update your local state so the UI refreshes
+            setTransactions(prev => prev.filter(t => t.id !== id));
+        }
+    } catch (error) {
+        console.error("Delete failed:", error);
+    }
+};
+
+  const updateTransaction = async (updatedTx) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/update-transaction/${updatedTx.id}/`,
+        {
+          method: "PUT", // or PATCH
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: updatedTx.description, // Map 'description' from modal back to 'title' for DB
+            amount: updatedTx.amount,
+            type: updatedTx.type.toLowerCase(),
+            category: updatedTx.category.toLowerCase(),
+            date: updatedTx.date,
+          }),
+        },
+      );
+
+      if (response.ok) {
+        showToast("Transaction updated!", "success");
+        fetchHistory(); // Refresh the list to show new values
+      } else {
+        showToast("Update failed on server", "error");
+      }
+    } catch (err) {
+      showToast("Connection error", "error");
+    }
   };
-
-  const updateTransaction = (tx) => console.log("Update:", tx);
-
   const bulkDeleteTransactions = (items) => {
     const idsToDelete = items.map((item) => item.id);
     setTransactions((prev) => prev.filter((t) => !idsToDelete.includes(t.id)));
@@ -342,13 +395,16 @@ export default function App() {
                   setActiveTab={setActiveTab}
                   showToast={showToast}
                   triggerConfirm={triggerConfirm}
+                  onSuccess={fetchHistory} // Pass the refresh function here
                 />
               )}
-              {activeTab !== TABS.HOME && activeTab !== TABS.HISTORY && activeTab !== TABS.ADD && (
-                <div className="text-center py-20 opacity-40 italic">
-                  {activeTab} Page is under construction.
-                </div>
-              )}
+              {activeTab !== TABS.HOME &&
+                activeTab !== TABS.HISTORY &&
+                activeTab !== TABS.ADD && (
+                  <div className="text-center py-20 opacity-40 italic">
+                    {activeTab} Page is under construction.
+                  </div>
+                )}
             </motion.div>
           </AnimatePresence>
         </main>

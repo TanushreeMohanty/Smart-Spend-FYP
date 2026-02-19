@@ -18,7 +18,9 @@ urlpatterns = [
     # 3. Data Endpoints (Matches your React AddPage fetch calls)
     path('add-transaction/', views.add_transaction, name='add_transaction'),
     path('update-settings/', views.update_settings, name='update_settings'),
-    
+    path('history/<int:user_id>/', views.get_transaction_history, name='transaction-history'),
+    path('update-transaction/<int:pk>/', views.update_transaction, name='update_transaction'),
+    path('delete-transaction/<int:pk>/', views.delete_transaction, name='delete_transaction'),
     # 4. Future Expansion (Optional: for History/Dashboard)
     # path('summary/', views.get_finance_summary, name='finance_summary'),
 ]

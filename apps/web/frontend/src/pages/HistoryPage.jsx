@@ -49,7 +49,7 @@ const HistoryPage = ({ transactions, onDelete, onBulkDelete, setActiveTab, onUpd
         // Text Search
         if (searchTerm) { 
             const term = searchTerm.toLowerCase(); 
-            data = data.filter(t => t.description.toLowerCase().includes(term) || t.amount.toString().includes(term)); 
+            data = data.filter(t => t.title.toLowerCase().includes(term) || t.amount.toString().includes(term)); 
         }
 
         // Date Range
