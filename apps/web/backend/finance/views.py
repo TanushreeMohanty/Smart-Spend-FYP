@@ -10,7 +10,7 @@ from django.db.models import Q
 
 from .models import Transaction, WealthItem, UserProfile
 from .serializers import TransactionSerializer, WealthItemSerializer
-
+from django.views.decorators.csrf import csrf_exempt # Add this import
 # --- AUTH ENDPOINTS ---
 
 @api_view(['POST'])
@@ -182,29 +182,95 @@ def update_transaction(request, pk):
     
 # --- WEALTH ENDPOINTS ---
 
+@csrf_exempt
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
-def wealth_list(request, user_id):
+@permission_classes([AllowAny]) # Ensures the frontend can access without JWT tokens for now
+def wealth_list_create(request, user_id):
+    # --- 1. GET: Fetch all assets and liabilities ---
     if request.method == 'GET':
-        items = WealthItem.objects.filter(user_id=user_id)
-        serializer = WealthItemSerializer(items, many=True)
-        return Response(serializer.data)
+        try:
+            items = WealthItem.objects.filter(user_id=user_id).order_by('-created_at')
+            data = [{
+                "id": item.id,
+                "title": item.title,
+                "amount": float(item.amount), # Ensure it's a number for Recharts
+                "type": item.type,
+                "category": item.category
+            } for item in items]
+            return Response(data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    if request.method == 'POST':
-        serializer = WealthItemSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(user_id=user_id)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # --- 2. POST: Add a new item ---
+    elif request.method == 'POST':
+        data = request.data
+        try:
+            # Validate user exists first to prevent ForeignKey errors
+            if not User.objects.filter(id=user_id).exists():
+                return Response({"error": "User does not exist"}, status=status.HTTP_404_NOT_FOUND)
 
+            # Create the item with explicit type casting
+            item = WealthItem.objects.create(
+                user_id=user_id,
+                title=data.get('title', 'Untitled'),
+                amount=float(data.get('amount', 0)), # Cast to float to handle strings from JSON
+                type=data.get('type', 'asset').lower(), # Ensure lowercase (asset/liability)
+                category=data.get('category', 'General')
+            )
+            
+            return Response({
+                "message": "Item added successfully", 
+                "id": item.id,
+                "item": {
+                    "title": item.title,
+                    "amount": float(item.amount)
+                }
+            }, status=status.HTTP_201_CREATED)
+
+        except (TypeError, ValueError):
+            return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+@csrf_exempt # Add this decorator
 @api_view(['DELETE'])
-@permission_classes([AllowAny])
-def delete_wealth_item(request, pk):
+def delete_wealth_item(request, item_id):
     try:
-        WealthItem.objects.get(pk=pk).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        item = WealthItem.objects.get(id=item_id)
+        item.delete()
+        return Response({"status": "deleted"}, status=status.HTTP_200_OK)
     except WealthItem.DoesNotExist:
-        return Response({"error": "Item not found"}, status=404)
+        return Response({"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+@csrf_exempt # Add this decorator
+@api_view(['PUT', 'PATCH'])
+def update_wealth_item(request, item_id):
+    try:
+        item = WealthItem.objects.get(id=item_id)
+        data = request.data
+
+        # Update fields if they exist in the request
+        item.title = data.get('title', item.title)
+        item.amount = data.get('amount', item.amount)
+        item.type = data.get('type', item.type)
+        item.category = data.get('category', item.category)
+        
+        item.save()
+        
+        return Response({
+            "message": "Updated successfully",
+            "item": {
+                "id": item.id,
+                "title": item.title,
+                "amount": float(item.amount)
+            }
+        })
+    except WealthItem.DoesNotExist:
+        return Response({"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+# Health Check Endpoint
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

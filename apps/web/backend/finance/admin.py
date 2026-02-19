@@ -21,6 +21,19 @@ class TransactionAdmin(admin.ModelAdmin):
 
 @admin.register(WealthItem)
 class WealthItemAdmin(admin.ModelAdmin):
-    list_display = ('name', 'amount', 'type', 'institution', 'user')
-    list_filter = ('type', 'institution', 'user')
-    search_fields = ('name', 'institution', 'user__username')
+    # Columns to display in the list view
+    list_display = ('title', 'user', 'amount_formatted', 'type', 'category', 'created_at')
+    
+    # Filters on the right sidebar
+    list_filter = ('type', 'category', 'user')
+    
+    # Search box functionality
+    search_fields = ('title', 'user__username', 'category')
+    
+    # Read-only fields
+    readonly_fields = ('created_at',)
+
+    # Helper to show currency symbol in admin
+    def amount_formatted(self, obj):
+        return f"₹{obj.amount:,.2f}"
+    amount_formatted.short_description = 'Amount'

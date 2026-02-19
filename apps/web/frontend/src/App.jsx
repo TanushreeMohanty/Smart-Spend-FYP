@@ -23,6 +23,7 @@ import WelcomeWizard from "./components/onboarding/WelcomeWizard";
 import LoginScreen from "./pages/LoginScreen";
 import HomePage from "./pages/HomePage";
 import HistoryPage from "./pages/HistoryPage";
+import WealthPage from "./pages/WealthPage";
 import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
@@ -89,41 +90,12 @@ export default function App() {
   const displayName = currentUser?.username
     ? currentUser.username.split(" ")[0]
     : "Guest";
-  // Inside your main React component
-
-  const fetchHistory = async () => {
-    if (!currentUser?.id) return; // Change 'user' to 'currentUser'
-
-    const response = await fetch(
-      `http://127.0.0.1:8000/api/finance/history/${currentUser.id}/`,
-    );
-    const data = await response.json();
-    setTransactions(data);
-  };
-
-  const fetchSettings = async () => {
-  if (!currentUser?.id) return;
-  try {
-    const response = await fetch(`${API_BASE_URL}/profile/${currentUser.id}/`);
-    const data = await response.json();
-    if (response.ok) {
-      setSettings(data); // This fills your Profile & Wizard state
-    }
-  } catch (err) {
-    console.error("Failed to load settings:", err);
-  }
-};
-
-  useEffect(() => {
-    fetchHistory();
-    fetchSettings(); // <--- ADD THIS LINE
-  }, [currentUser?.id]); // Change 'user' to 'currentUser'
 
   // --- 3. UI HELPERS ---
-  const showToast = useCallback((msg, type = "info") => {
-    setToast({ show: true, msg, type });
-    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3000);
-  }, []);
+  // const showToast = useCallback((msg, type = "info") => {
+  //   setToast({ show: true, msg, type });
+  //   setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3000);
+  // }, []);
 
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";
@@ -148,12 +120,122 @@ export default function App() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isHeaderPinned]);
 
+  // Inside your main React component
+
+  // const fetchHistory = async () => {
+  //   if (!currentUser?.id) return; // Change 'user' to 'currentUser'
+
+  //   const response = await fetch(
+  //     `http://127.0.0.1:8000/api/finance/history/${currentUser.id}/`,
+  //   );
+  //   const data = await response.json();
+  //   setTransactions(data);
+  // };
+
+  // const fetchSettings = async () => {
+  //   if (!currentUser?.id) return;
+  //   try {
+  //     const response = await fetch(
+  //       `${API_BASE_URL}/profile/${currentUser.id}/`,
+  //     );
+  //     const data = await response.json();
+  //     if (response.ok) {
+  //       setSettings(data); // This fills your Profile & Wizard state
+  //     }
+  //   } catch (err) {
+  //     console.error("Failed to load settings:", err);
+  //   }
+  // };
+
+  // const fetchWealth = useCallback(async () => {
+  //   if (!currentUser?.id) return; // Ensure we have a user ID before calling
+
+  //   try {
+  //     const response = await fetch(
+  //       `${API_BASE_URL}/get-wealth/${currentUser.id}/`,
+  //     );
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       // 'data' should be an array of objects: [{id, title, amount, type}, ...]
+  //       setWealthItems(data);
+  //     } else {
+  //       console.error("Failed to fetch wealth items");
+  //     }
+  //   } catch (err) {
+  //     console.error("Network error fetching wealth:", err);
+  //     showToast("Could not sync portfolio", "error");
+  //   }
+  // }, [currentUser?.id, showToast]);
+
+  // useEffect(() => {
+  //   fetchHistory();
+  //   fetchSettings(); // <--- ADD THIS LINE
+  //   fetchWealth(); // <--- ADD THIS LINE
+  // }, [currentUser?.id]);
+
   // Basic confirmation placeholder
+  // const triggerConfirm = (message, onConfirm) => {
+  //   if (window.confirm(message)) {
+  //     onConfirm();
+  //   }
+  // };
+
+  // 1. Move UI Helpers to the very top of the function body
+  const showToast = useCallback((msg, type = "info") => {
+    setToast({ show: true, msg, type });
+    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3000);
+  }, []);
+
   const triggerConfirm = (message, onConfirm) => {
-    if (window.confirm(message)) {
-      onConfirm();
-    }
+    if (window.confirm(message)) onConfirm();
   };
+
+  // 2. Use regular function syntax for these to avoid "Initialization" errors
+  async function fetchHistory() {
+    if (!currentUser?.id) return;
+    const response = await fetch(
+      `http://127.0.0.1:8000/api/finance/history/${currentUser.id}/`,
+    );
+    const data = await response.json();
+    setTransactions(data);
+  }
+
+  async function fetchSettings() {
+    if (!currentUser?.id) return;
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/profile/${currentUser.id}/`,
+      );
+      const data = await response.json();
+      if (response.ok) setSettings(data);
+    } catch (err) {
+      console.error("Failed to load settings:", err);
+    }
+  }
+
+  // 3. Keep this as useCallback, but it will now find showToast easily
+  const fetchWealth = useCallback(async () => {
+    if (!currentUser?.id) return;
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/get-wealth/${currentUser.id}/`,
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setWealthItems(data);
+      }
+    } catch (err) {
+      showToast("Could not sync portfolio", "error");
+    }
+  }, [currentUser?.id, showToast]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchHistory();
+      fetchSettings();
+      fetchWealth();
+    }
+  }, [currentUser?.id, fetchWealth]); // Adding fetchWealth here ensures it stays in sync
 
   // --- 4. ACTION HANDLERS ---
   const deleteTransaction = async (id) => {
@@ -208,31 +290,6 @@ export default function App() {
     showToast("Bulk delete successful", "success");
   };
 
-  // const handleWizardComplete = async (wizardData) => {
-  //   try {
-  //     const response = await fetch(`${API_BASE_URL}/update-settings/`, {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         user_id: currentUser.id, // Good
-  //         monthlyIncome: wizardData.monthlyIncome, // Changed from monthly_income
-  //         monthlyBudget: wizardData.budgetLimit, // Changed from monthly_budget
-  //         is_business: wizardData.isBusiness, // matches backend
-  //       }),
-  //     });
-  //     if (response.ok) {
-  //       showToast("Profile set up successfully!", "success");
-  //       setSettings({
-  //         monthlyBudget: wizardData.budgetLimit,
-  //         monthlyIncome: wizardData.monthlyIncome,
-  //       });
-  //       setShowWizard(false);
-  //     }
-  //   } catch (err) {
-  //     showToast("Server unreachable", "error");
-  //   }
-  // };
-
   const requestDeleteTransaction = (id) =>
     triggerConfirm("Permanently delete?", () => deleteTransaction(id));
   const requestBulkDelete = (items) =>
@@ -240,41 +297,39 @@ export default function App() {
       bulkDeleteTransactions(items),
     );
 
-  // const updateProfileSettings = async (localSettings) => {
-  //   try {
-  //     const response = await fetch(
-  //       `${API_BASE_URL}/profile/${currentUser.id}/`,
-  //       {
-  //         method: "POST",
-  //         headers: { "Content-Type": "application/json" },
-  //         // localSettings already contains monthlyIncome, monthlyBudget, etc.
-  //         body: JSON.stringify(localSettings),
-  //       },
-  //     );
+  const updateWealthItem = async (updatedItem) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/update-wealth/${updatedItem.id}/`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedItem),
+        },
+      );
 
-  //     if (!response.ok) {
-  //       const errorData = await response.json();
-  //       throw new Error(errorData.error || "Update failed");
-  //     }
-
-  //     const data = await response.json();
-  //     setSettings(data.settings); // Update global state with saved data
-  //     showToast("Profile Saved!", "success");
-  //   } catch (err) {
-  //     console.error("Save Error:", err);
-  //     showToast(err.message, "error");
-  //   }
-  // };
-
+      if (response.ok) {
+        showToast("Portfolio updated!", "success");
+        fetchWealth(); // Refresh the list
+      } else {
+        showToast("Failed to update item", "error");
+      }
+    } catch (err) {
+      showToast("Connection error", "error");
+    }
+  };
   // --- 4. ACTION HANDLERS ---
 
   const saveSettings = async (dataToSave) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/profile/${currentUser.id}/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dataToSave),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/profile/${currentUser.id}/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dataToSave),
+        },
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -283,9 +338,9 @@ export default function App() {
 
       const data = await response.json();
       // data.settings comes back from Django with the latest floats
-      setSettings(data.settings); 
+      setSettings(data.settings);
       showToast("Settings saved!", "success");
-      return true; 
+      return true;
     } catch (err) {
       console.error("Save Error:", err);
       showToast(err.message, "error");
@@ -302,6 +357,24 @@ export default function App() {
   if (!currentUser) {
     return <LoginScreen onAuthSuccess={setCurrentUser} showToast={showToast} />;
   }
+
+  // Inside App.jsx
+  const executeDeleteWealth = async (itemId) => {
+    try {
+      // Note: URL now includes the itemId at the end
+      const response = await fetch(`${API_BASE_URL}/delete-wealth/${itemId}/`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (response.ok) {
+        showToast("Item removed", "success");
+        fetchWealth(); // Refresh the list
+      }
+    } catch (e) {
+      showToast("Failed to remove", "error");
+    }
+  };
 
   return (
     <div
@@ -482,10 +555,21 @@ export default function App() {
                   triggerConfirm={triggerConfirm}
                 />
               )}
+              {activeTab === TABS.WEALTH && (
+                <WealthPage
+                  wealthItems={wealthItems} // Live data from Django/State
+                  user={currentUser} // Current logged in user
+                  appId={settings?.appId} // or however you store appId
+                  onSuccess={fetchWealth} // IMPORTANT: The function that re-fetches from Django
+                  showToast={showToast} // Global notification system
+                  triggerConfirm={triggerConfirm} // Global delete confirmation
+                />
+              )}
               {activeTab !== TABS.HOME &&
                 activeTab !== TABS.HISTORY &&
                 activeTab !== TABS.ADD &&
-                activeTab !== TABS.PROFILE && (
+                activeTab !== TABS.PROFILE &&
+                activeTab !== TABS.WEALTH && (
                   <div className="text-center py-20 opacity-40 italic">
                     {activeTab} Page is under construction.
                   </div>

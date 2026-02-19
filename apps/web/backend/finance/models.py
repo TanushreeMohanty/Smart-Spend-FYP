@@ -37,13 +37,18 @@ class Transaction(models.Model):
         return f"{self.title} - {self.amount}"
 
 class WealthItem(models.Model):
-    WEALTH_TYPES = (('asset', 'Asset'), ('liability', 'Liability'))
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='wealth_items')
-    name = models.CharField(max_length=255)
+    # Mapping to your React "type": "asset" or "liability"
+    TYPE_CHOICES = [
+        ('asset', 'Asset'),
+        ('liability', 'Liability'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="wealth_items")
+    title = models.CharField(max_length=100)  # e.g., "HDFC Bank", "Car Loan"
     amount = models.DecimalField(max_digits=15, decimal_places=2)
-    type = models.CharField(max_length=10, choices=WEALTH_TYPES)
-    institution = models.CharField(max_length=100, blank=True)
+    category = models.CharField(max_length=50, default="General") # e.g., "Cash", "Investment"
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.name} ({self.type})"
+        return f"{self.title} - {self.amount}"

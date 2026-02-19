@@ -20,6 +20,7 @@ const WealthPage = ({
   appId,
   showToast,
   triggerConfirm,
+  onSuccess, // <--- ADD THIS HERE
 }) => {
   const [wealthName, setWealthName] = useState("");
   const [wealthAmount, setWealthAmount] = useState("");
@@ -44,45 +45,63 @@ const WealthPage = ({
     { month: "Jan", value: netWorth },
   ];
 
-  const executeAddWealth = async () => {
-    const actualAmount = parseFloat(wealthAmount) * wealthUnit;
-    try {
-      await addDoc(
-        collection(db, "artifacts", appId, "users", user.uid, "wealth"),
-        {
-          name: wealthName,
-          amount: actualAmount,
-          type: wealthType,
-          date: serverTimestamp(),
-        },
-      );
+// --- 3. Handlers ---
+const executeAddWealth = async (data) => {
+  try {
+    const response = await fetch(`http://127.0.0.1:8000/api/finance/get-wealth/${user.id}/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: data.title, // Correctly mapped
+        amount: parseFloat(data.amount) * parseFloat(data.unit),
+        type: data.type,
+        category: "General",
+      }),
+    });
+
+    if (response.ok) {
       setWealthName("");
       setWealthAmount("");
-      setWealthUnit(1);
-      setWealthType("asset");
-      showToast("Asset/Liability added", "success");
-    } catch (e) {
-      console.error(e);
-      showToast("Failed to save", "error");
+      showToast("Item added successfully!", "success");
+      onSuccess(); // <--- CRITICAL: Refetches data from Django
+    } else {
+      showToast("Failed to add item", "error");
     }
-  };
+  } catch (error) {
+    showToast("Server error", "error");
+  }
+};
 
   const requestAddWealth = (e) => {
     e.preventDefault();
     if (!wealthName || !wealthAmount || !user) return;
-    triggerConfirm("Confirm adding this asset/liability?", executeAddWealth);
+
+    // Create the data object HERE to pass to the trigger
+    const newItem = {
+      title: wealthName,
+      amount: wealthAmount,
+      type: wealthType,
+      unit: wealthUnit,
+    };
+
+    triggerConfirm("Confirm adding this asset/liability?", () => executeAddWealth(newItem));
   };
 
-  const executeDeleteWealth = async (id) => {
-    try {
-      await deleteDoc(
-        doc(db, "artifacts", appId, "users", user.uid, "wealth", id),
-      );
+const executeDeleteWealth = async (id) => {
+  try {
+    // Correct URL format matching your Django urls.py
+    const response = await fetch(`http://127.0.0.1:8000/api/finance/delete-wealth/${id}/`, {
+      method: "DELETE",
+    });
+
+    if (response.ok) {
       showToast("Item removed", "success");
-    } catch (e) {
-      showToast("Failed to remove", "error");
+      onSuccess(); // <--- CRITICAL: Refetches data from Django
     }
-  };
+  } catch (e) {
+    showToast("Failed to remove", "error");
+  }
+};
 
   const requestDeleteWealth = (id) =>
     triggerConfirm("Remove this item?", () => executeDeleteWealth(id));

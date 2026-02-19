@@ -12,9 +12,10 @@ class TransactionSerializer(serializers.ModelSerializer):
         model = Transaction
         # Added 'is_recurring' so your frontend knows which are subscriptions
         fields = ['id', 'title', 'amount', 'type', 'category', 'date', 'is_recurring']
-
+        
 class WealthItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = WealthItem
-        # Including 'user' is usually helpful for POST requests
-        fields = ['id', 'name', 'amount', 'type', 'institution']
+        # Changed 'name' to 'title' and 'institution' to 'category' 
+        # to match your models.py
+        fields = ['id', 'title', 'amount', 'type', 'category']
