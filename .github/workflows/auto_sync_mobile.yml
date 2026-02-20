@@ -24,7 +24,7 @@ jobs:
       - name: Pull from Upstream Main
         run: |
           # 1. Add the original source as a remote
-          git remote add upstream https://github.com/TanushreeMohanty/Smart-Spend-FYP
+          git remote add upstream https://github.com/TanushreeMohanty/Smart-Spend-FYP.git
           
           # 2. Fetch only their main branch
           git fetch upstream main
