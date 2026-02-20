@@ -1,4 +1,4 @@
-# SmartSpend Pro
+# Spendsy
 
 **Version:** v5.3.0  
 **Type:** Final Year Project (FYP)
