@@ -8,8 +8,8 @@ from rest_framework.response import Response
 from rest_framework import viewsets, status
 from django.db.models import Q
 
-from .models import Transaction, WealthItem, UserProfile
-from .serializers import TransactionSerializer, WealthItemSerializer
+from .models import Transaction, WealthItem, UserProfile, TaxProfile
+from .serializers import TaxProfileSerializer, TransactionSerializer, WealthItemSerializer, UserProfileSerializer
 from django.views.decorators.csrf import csrf_exempt # Add this import
 # --- AUTH ENDPOINTS ---
 
@@ -270,6 +270,51 @@ def update_wealth_item(request, item_id):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
+@csrf_exempt
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def manage_tax_profile(request, user_id):
+    try:
+        # Check if the user exists first
+        user = User.objects.get(id=user_id)
+        
+        # This is the key: if profile doesn't exist, it creates it 
+        # instead of returning a 404.
+        profile, created = TaxProfile.objects.get_or_create(user=user)
+
+        if request.method == 'POST':
+            # partial=True allows updating just a few fields if needed
+            serializer = TaxProfileSerializer(profile, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # GET request logic
+        serializer = TaxProfileSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
+@csrf_exempt # Add this decorator
+@api_view(['POST'])
+@permission_classes([AllowAny]) # Ensures the frontend can access without JWT tokens for now
+def save_tax_profile(request):
+    # Assuming the user is authenticated
+    user = request.user 
+    
+    # This finds the existing profile or prepares to create a new one
+    profile, created = TaxProfile.objects.get_or_create(user=user)
+    
+    serializer = TaxProfileSerializer(profile, data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+    return Response(serializer.errors, status=400)
 # Health Check Endpoint
 
 @api_view(['GET'])

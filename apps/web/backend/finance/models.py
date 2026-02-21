@@ -52,3 +52,25 @@ class WealthItem(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.amount}"
+    
+class TaxProfile(models.Model):
+    # Link to the built-in Django User
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='tax_profile')
+    
+    # Checkbox field
+    is_business = models.BooleanField(default=False)
+    
+    # Numeric Input fields (from your 'fields' constant in React)
+    annual_rent = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    annual_epf = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    nps_contribution = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    health_insurance_self = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    health_insurance_parents = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    home_loan_interest = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    education_loan_interest = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    
+    # Metadata
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Tax Profile for {self.user.username}"

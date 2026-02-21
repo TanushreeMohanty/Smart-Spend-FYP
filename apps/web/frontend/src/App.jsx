@@ -1,7 +1,3 @@
-// ==========================================
-// START OF CODE: App.jsx
-// ==========================================
-
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   TABS,
@@ -9,27 +5,48 @@ import {
 } from "../../../../packages/shared/config/constants";
 import { cn } from "../../../../packages/shared/utils/cn";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Sun, Moon, ArrowDown, ArrowUp } from "lucide-react";
+import {
+  Zap,
+  Sun,
+  Moon,
+  ArrowDown,
+  ArrowUp,
+  Pin,
+  PinOff,
+  Layout as LayoutIcon,
+} from "lucide-react";
 import { formatIndianCompact } from "../../../../packages/shared/utils/helpers";
-import AddPage from "./pages/AddPage";
-import { Pin, PinOff, Layout as LayoutIcon } from "lucide-react"; // Ensure these are in your lucide-react import
-
-// Components
 import { Navigation } from "./components/ui/Navigation";
 import { Toast, ConfirmationDialog } from "./components/ui/Shared";
-import WelcomeWizard from "./components/onboarding/WelcomeWizard";
 
-// Pages
+import WelcomeWizard from "./components/onboarding/WelcomeWizard";
 import LoginScreen from "./pages/LoginScreen";
 import HomePage from "./pages/HomePage";
 import HistoryPage from "./pages/HistoryPage";
+import AddPage from "./pages/AddPage";
 import WealthPage from "./pages/WealthPage";
 import ProfilePage from "./pages/ProfilePage";
+import AuditPage from "./pages/AuditPage";
+import StatsPage from "./pages/StatsPage";
+import ITRPage from "./pages/ITRPage";
 
 export default function App() {
   const API_BASE_URL = "http://127.0.0.1:8000/api/finance";
 
-  // --- 1. STATE MANAGEMENT ---
+  const initialDefaultProfile = useMemo(
+    () => ({
+      annualRent: 0,
+      annualEPF: 0,
+      npsContribution: 0,
+      healthInsuranceSelf: 0,
+      healthInsuranceParents: 0,
+      homeLoanInterest: 0,
+      educationLoanInterest: 0,
+      isBusiness: false,
+    }),
+    [],
+  );
+
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState(TABS.HOME);
   const [toast, setToast] = useState({ show: false, msg: "", type: "info" });
@@ -37,35 +54,35 @@ export default function App() {
     () => localStorage.getItem("app_theme") || "dark",
   );
   const [showWizard, setShowWizard] = useState(false);
-
-  // Data State (Note: If using useData() later, replace these state declarations)
   const [transactions, setTransactions] = useState([]);
   const [wealthItems, setWealthItems] = useState([]);
   const [settings, setSettings] = useState({
     monthlyBudget: 0,
     monthlyIncome: 0,
   });
+  const [taxProfile, setTaxProfile] = useState(() => {
+    const saved = localStorage.getItem("tax_profile");
+    try {
+      return saved ? JSON.parse(saved) : initialDefaultProfile;
+    } catch (e) {
+      console.error("Failed to parse tax profile:", e);
+      return initialDefaultProfile;
+    }
+  });
 
-  //Add Transaction Modal State
-  const [isHeaderPinned, setIsHeaderPinned] = useState(
-    () => localStorage.getItem("smartSpend_header_pinned") === "true",
-  );
-  const [scrollOpacity, setScrollOpacity] = useState(1);
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     message: "",
     action: null,
   });
 
-  // --- 2. CALCULATIONS ---
   const totals = useMemo(() => {
-    // Ensure transactions is ALWAYS an array before reducing
     if (!Array.isArray(transactions)) return { income: 0, expenses: 0 };
-
     return transactions.reduce(
       (acc, curr) => {
         const amt = parseFloat(curr.amount || 0);
-        curr.type === "income" ? (acc.income += amt) : (acc.expenses += amt);
+        if (curr.type === "income") acc.income += amt;
+        else if (curr.type === "expense") acc.expenses += amt;
         return acc;
       },
       { income: 0, expenses: 0 },
@@ -87,15 +104,7 @@ export default function App() {
     [wealthItems],
   );
 
-  const displayName = currentUser?.username
-    ? currentUser.username.split(" ")[0]
-    : "Guest";
-
-  // --- 3. UI HELPERS ---
-  // const showToast = useCallback((msg, type = "info") => {
-  //   setToast({ show: true, msg, type });
-  //   setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3000);
-  // }, []);
+  const firstName = currentUser?.username?.split(" ")[0] || "Guest";
 
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";
@@ -103,99 +112,31 @@ export default function App() {
     localStorage.setItem("app_theme", newTheme);
   };
 
-  const togglePin = () => {
-    const newState = !isHeaderPinned;
-    setIsHeaderPinned(newState);
-    localStorage.setItem("smartSpend_header_pinned", newState);
-    if (newState) setScrollOpacity(1);
-  };
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!isHeaderPinned)
-        setScrollOpacity(Math.max(0, 1 - window.scrollY / 150));
-      else setScrollOpacity(1);
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [isHeaderPinned]);
-
-  // Inside your main React component
-
-  // const fetchHistory = async () => {
-  //   if (!currentUser?.id) return; // Change 'user' to 'currentUser'
-
-  //   const response = await fetch(
-  //     `http://127.0.0.1:8000/api/finance/history/${currentUser.id}/`,
-  //   );
-  //   const data = await response.json();
-  //   setTransactions(data);
-  // };
-
-  // const fetchSettings = async () => {
-  //   if (!currentUser?.id) return;
-  //   try {
-  //     const response = await fetch(
-  //       `${API_BASE_URL}/profile/${currentUser.id}/`,
-  //     );
-  //     const data = await response.json();
-  //     if (response.ok) {
-  //       setSettings(data); // This fills your Profile & Wizard state
-  //     }
-  //   } catch (err) {
-  //     console.error("Failed to load settings:", err);
-  //   }
-  // };
-
-  // const fetchWealth = useCallback(async () => {
-  //   if (!currentUser?.id) return; // Ensure we have a user ID before calling
-
-  //   try {
-  //     const response = await fetch(
-  //       `${API_BASE_URL}/get-wealth/${currentUser.id}/`,
-  //     );
-  //     if (response.ok) {
-  //       const data = await response.json();
-  //       // 'data' should be an array of objects: [{id, title, amount, type}, ...]
-  //       setWealthItems(data);
-  //     } else {
-  //       console.error("Failed to fetch wealth items");
-  //     }
-  //   } catch (err) {
-  //     console.error("Network error fetching wealth:", err);
-  //     showToast("Could not sync portfolio", "error");
-  //   }
-  // }, [currentUser?.id, showToast]);
-
-  // useEffect(() => {
-  //   fetchHistory();
-  //   fetchSettings(); // <--- ADD THIS LINE
-  //   fetchWealth(); // <--- ADD THIS LINE
-  // }, [currentUser?.id]);
-
-  // Basic confirmation placeholder
-  // const triggerConfirm = (message, onConfirm) => {
-  //   if (window.confirm(message)) {
-  //     onConfirm();
-  //   }
-  // };
-
-  // 1. Move UI Helpers to the very top of the function body
   const showToast = useCallback((msg, type = "info") => {
     setToast({ show: true, msg, type });
     setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3000);
   }, []);
 
+  // Fixed: The triggerConfirm function was defined but the confirmModal state (isOpen, message, action) was never utilized.
+  // Switching to the state-based approach for a better UI experience.
   const triggerConfirm = (message, onConfirm) => {
-    if (window.confirm(message)) onConfirm();
+    setConfirmModal({
+      isOpen: true,
+      message,
+      action: () => {
+        onConfirm();
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
   };
 
-  // 2. Use regular function syntax for these to avoid "Initialization" errors
+  // Note: You must also add the <ConfirmationDialog /> component to your JSX return
+  // at the same level as <Toast />:
+
   async function fetchHistory() {
     if (!currentUser?.id) return;
-    const response = await fetch(
-      `http://127.0.0.1:8000/api/finance/history/${currentUser.id}/`,
-    );
+    // Use the constant!
+    const response = await fetch(`${API_BASE_URL}/history/${currentUser.id}/`);
     const data = await response.json();
     setTransactions(data);
   }
@@ -213,7 +154,6 @@ export default function App() {
     }
   }
 
-  // 3. Keep this as useCallback, but it will now find showToast easily
   const fetchWealth = useCallback(async () => {
     if (!currentUser?.id) return;
     try {
@@ -229,43 +169,87 @@ export default function App() {
     }
   }, [currentUser?.id, showToast]);
 
+  const fetchTaxProfile = useCallback(async () => {
+    if (!currentUser?.id) return;
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/tax-profile/${currentUser.id}/`,
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setTaxProfile(data);
+        localStorage.setItem("tax_profile", JSON.stringify(data));
+      } else if (response.status === 404) {
+        // Normal for new users: Just keep using the initialDefaultProfile
+        console.log("No profile found on server, using local defaults.");
+      }
+    } catch (e) {
+      console.error("Network error during tax profile sync", e);
+    }
+  }, [currentUser?.id]);
+
+  const updateTaxProfile = async (localProfile) => {
+    if (!currentUser?.id) {
+      showToast("Session expired. Please login again.", "error");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/tax-profile/${currentUser.id}/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(localProfile),
+        },
+      );
+
+      if (response.ok) {
+        const savedData = await response.json();
+        setTaxProfile(savedData);
+        localStorage.setItem("tax_profile", JSON.stringify(savedData));
+        showToast("Profile synced!", "success");
+      }
+    } catch (error) {
+      showToast("Network error", "error");
+    }
+  };
+
   useEffect(() => {
     if (currentUser?.id) {
       fetchHistory();
       fetchSettings();
       fetchWealth();
+      fetchTaxProfile(); // Add this!
     }
-  }, [currentUser?.id, fetchWealth]); // Adding fetchWealth here ensures it stays in sync
+  }, [currentUser?.id, fetchWealth, fetchTaxProfile]); // Add fetchTaxProfile to dependencies
 
-  // --- 4. ACTION HANDLERS ---
   const deleteTransaction = async (id) => {
     try {
-      // Ensure there's a slash after the ID if your Django URL has one
+      // Use the constant!
       const response = await fetch(
-        `http://127.0.0.1:8000/api/finance/delete-transaction/${id}/`,
+        `${API_BASE_URL}/delete-transaction/${id}/`,
         {
           method: "DELETE",
         },
       );
-
       if (response.ok) {
-        // Update your local state so the UI refreshes
         setTransactions((prev) => prev.filter((t) => t.id !== id));
       }
     } catch (error) {
       console.error("Delete failed:", error);
     }
   };
-
   const updateTransaction = async (updatedTx) => {
     try {
       const response = await fetch(
         `${API_BASE_URL}/update-transaction/${updatedTx.id}/`,
         {
-          method: "PUT", // or PATCH
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            title: updatedTx.description, // Map 'description' from modal back to 'title' for DB
+            title: updatedTx.description,
             amount: updatedTx.amount,
             type: updatedTx.type.toLowerCase(),
             category: updatedTx.category.toLowerCase(),
@@ -276,7 +260,7 @@ export default function App() {
 
       if (response.ok) {
         showToast("Transaction updated!", "success");
-        fetchHistory(); // Refresh the list to show new values
+        fetchHistory();
       } else {
         showToast("Update failed on server", "error");
       }
@@ -296,7 +280,6 @@ export default function App() {
     triggerConfirm(`Delete ${items.length} items?`, () =>
       bulkDeleteTransactions(items),
     );
-
   const updateWealthItem = async (updatedItem) => {
     try {
       const response = await fetch(
@@ -310,7 +293,7 @@ export default function App() {
 
       if (response.ok) {
         showToast("Portfolio updated!", "success");
-        fetchWealth(); // Refresh the list
+        fetchWealth();
       } else {
         showToast("Failed to update item", "error");
       }
@@ -318,8 +301,6 @@ export default function App() {
       showToast("Connection error", "error");
     }
   };
-  // --- 4. ACTION HANDLERS ---
-
   const saveSettings = async (dataToSave) => {
     try {
       const response = await fetch(
@@ -337,7 +318,6 @@ export default function App() {
       }
 
       const data = await response.json();
-      // data.settings comes back from Django with the latest floats
       setSettings(data.settings);
       showToast("Settings saved!", "success");
       return true;
@@ -348,20 +328,8 @@ export default function App() {
     }
   };
 
-  // Now, your specific handlers just call the master function above:
-  const handleWizardComplete = async (wizardData) => {
-    const success = await saveSettings(wizardData);
-    if (success) setShowWizard(false);
-  };
-  // --- 5. AUTH GUARD ---
-  if (!currentUser) {
-    return <LoginScreen onAuthSuccess={setCurrentUser} showToast={showToast} />;
-  }
-
-  // Inside App.jsx
   const executeDeleteWealth = async (itemId) => {
     try {
-      // Note: URL now includes the itemId at the end
       const response = await fetch(`${API_BASE_URL}/delete-wealth/${itemId}/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -369,13 +337,41 @@ export default function App() {
 
       if (response.ok) {
         showToast("Item removed", "success");
-        fetchWealth(); // Refresh the list
+        fetchWealth();
       }
     } catch (e) {
       showToast("Failed to remove", "error");
     }
   };
 
+  const handleWizardComplete = async (wizardData) => {
+    const success = await saveSettings(wizardData);
+    if (success) setShowWizard(false);
+  };
+
+  useEffect(() => {
+    const loadPdfWorker = async () => {
+      const src =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      if (!document.querySelector(`script[src="${src}"]`)) {
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        script.onload = () => {
+          if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+              "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+          }
+        };
+        document.head.appendChild(script);
+      }
+    };
+    loadPdfWorker();
+  }, []);
+
+  if (!currentUser) {
+    return <LoginScreen onAuthSuccess={setCurrentUser} showToast={showToast} />;
+  }
   return (
     <div
       className={cn(
@@ -385,7 +381,6 @@ export default function App() {
           : "bg-[#cfd9e5] text-slate-900",
       )}
     >
-      {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#3b82f6,transparent_75%)] opacity-10 blur-[120px]" />
       </div>
@@ -399,10 +394,20 @@ export default function App() {
       <Navigation
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onSignOut={() => setCurrentUser(null)}
+        onSignOut={() => {
+          setCurrentUser(null);
+          setTransactions([]);
+          setWealthItems([]);
+          localStorage.removeItem("tax_profile"); // Clean up sensitive tax data
+        }}
       />
       <WelcomeWizard isOpen={showWizard} onComplete={handleWizardComplete} />
-
+      <ConfirmationDialog
+        isOpen={confirmModal.isOpen}
+        message={confirmModal.message}
+        onConfirm={confirmModal.action}
+        onCancel={() => setConfirmModal((p) => ({ ...p, isOpen: false }))}
+      />
       <div className="mx-auto min-h-screen relative z-10 max-w-6xl px-12 flex flex-col">
         <header className="pt-10 mb-8 flex justify-between items-end">
           <div>
@@ -412,9 +417,7 @@ export default function App() {
                 Spendsy
               </span>
             </div>
-            <h1 className="text-5xl font-black">
-              Hello, {currentUser.username?.split(" ")[0]}
-            </h1>
+            <h1 className="text-5xl font-black">Hello, {firstName}</h1>
           </div>
           <div className="flex gap-3">
             <button
@@ -436,7 +439,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* 3. HERO CARD (Current Balance & Stats) */}
         {[TABS.HOME, TABS.ADD, TABS.STATS, TABS.WEALTH].includes(activeTab) && (
           <motion.div
             whileHover={{ scale: 1.01, y: -2 }}
@@ -449,7 +451,6 @@ export default function App() {
             )}
           >
             <div className="relative z-10">
-              {/* Label */}
               <div className="flex items-center gap-2 mb-4 opacity-50">
                 <LayoutIcon className="w-4 h-4" />
                 <p className="text-xs font-bold uppercase tracking-widest">
@@ -459,7 +460,6 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Main Figure */}
               <h2
                 className={cn(
                   "font-black mb-10 tracking-tighter text-7xl leading-tight",
@@ -471,9 +471,7 @@ export default function App() {
                   : `₹${balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
               </h2>
 
-              {/* Stats Grid */}
               <div className="grid grid-cols-2 gap-6">
-                {/* Income / Assets Tile */}
                 <div className="p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-2 text-emerald-500">
                     <ArrowDown className="w-4 h-4" />
@@ -488,7 +486,6 @@ export default function App() {
                   </p>
                 </div>
 
-                {/* Expense / Liabilities Tile */}
                 <div className="p-5 rounded-3xl bg-rose-500/10 border border-rose-500/20">
                   <div className="flex items-center gap-2 mb-2 text-rose-500">
                     <ArrowUp className="w-4 h-4" />
@@ -539,11 +536,11 @@ export default function App() {
               {activeTab === TABS.ADD && (
                 <AddPage
                   user={currentUser}
-                  appId={settings?.appId} // or however you store appId
+                  appId={settings?.appId}
                   setActiveTab={setActiveTab}
                   showToast={showToast}
                   triggerConfirm={triggerConfirm}
-                  onSuccess={fetchHistory} // Pass the refresh function here
+                  onSuccess={fetchHistory}
                 />
               )}
               {activeTab === TABS.PROFILE && (
@@ -557,19 +554,46 @@ export default function App() {
               )}
               {activeTab === TABS.WEALTH && (
                 <WealthPage
-                  wealthItems={wealthItems} // Live data from Django/State
-                  user={currentUser} // Current logged in user
-                  appId={settings?.appId} // or however you store appId
-                  onSuccess={fetchWealth} // IMPORTANT: The function that re-fetches from Django
-                  showToast={showToast} // Global notification system
-                  triggerConfirm={triggerConfirm} // Global delete confirmation
+                  wealthItems={wealthItems}
+                  user={currentUser}
+                  appId={settings?.appId}
+                  onSuccess={fetchWealth}
+                  showToast={showToast}
+                  triggerConfirm={triggerConfirm}
+                />
+              )}
+              {activeTab === TABS.AUDIT && (
+                <AuditPage
+                  transactions={transactions}
+                  wealthItems={wealthItems}
+                  taxProfile={taxProfile}
+                  onUpdateProfile={updateTaxProfile}
+                  showToast={showToast}
+                  settings={settings}
+                  setActiveTab={setActiveTab}
+                />
+              )}
+
+              {activeTab === TABS.STATS && (
+                <StatsPage transactions={transactions} />
+              )}
+
+              {activeTab === TABS.ITR && (
+                <ITRPage
+                  user={currentUser}
+                  transactions={transactions}
+                  setActiveTab={setActiveTab}
+                  showToast={showToast}
                 />
               )}
               {activeTab !== TABS.HOME &&
                 activeTab !== TABS.HISTORY &&
                 activeTab !== TABS.ADD &&
                 activeTab !== TABS.PROFILE &&
-                activeTab !== TABS.WEALTH && (
+                activeTab !== TABS.WEALTH &&
+                activeTab !== TABS.AUDIT &&
+                activeTab !== TABS.STATS &&
+                activeTab !== TABS.ITR && (
                   <div className="text-center py-20 opacity-40 italic">
                     {activeTab} Page is under construction.
                   </div>
@@ -586,10 +610,6 @@ export default function App() {
   );
 }
 
-// ==========================================
-// END OF CODE: App.jsx
-// ==========================================
-
 // //Actual code for spendsy -------------------------------------------------------------
 
 // // Context (Logic preserved 100%)
@@ -597,14 +617,10 @@ export default function App() {
 // import { useData } from "../../../../packages/shared/context/DataContext";
 
 // // Config & Utils
-// import { formatIndianCompact } from "../../../../packages/shared/utils/helpers";
 
 // // Pages
-// import AddPage from "./pages/AddPage"; // Section 3
 // import AuditPage from "./pages/AuditPage"; // Section 4
 // import StatsPage from "./pages/StatsPage"; // Section 5
-// import WealthPage from "./pages/WealthPage"; // Section 6
-// import ProfilePage from "./pages/ProfilePage"; // Section 7
 // import ITRPage from "./pages/ITRPage"; // ITR Wizard
 
 // export default function App() {
@@ -621,13 +637,7 @@ export default function App() {
 //   } = useAuth();
 
 //   // --- 2. Local UI State ---
-//   const [isHeaderPinned, setIsHeaderPinned] = useState(true);
-//   const [scrollOpacity, setScrollOpacity] = useState(1);
-//   const [confirmModal, setConfirmModal] = useState({
-//     isOpen: false,
-//     message: "",
-//     action: null,
-//   });
+
 //   const layoutMode = "desktop-full"; // Force desktop view
 
 //   // --- 3. Helpers (Original Logic) ---
@@ -678,11 +688,7 @@ export default function App() {
 //     };
 //     loadPdfWorker();
 
-//     // 2. HEADER PIN PREFERENCE
-//     const savedPin = localStorage.getItem("smartSpend_header_pinned");
-//     if (savedPin !== null) {
-//       setIsHeaderPinned(savedPin === "true");
-//     }
+
 
 //     // 3. ONBOARDING WIZARD TRIGGER
 //     // Logic: Only show if user is fully logged in, not a guest,
@@ -697,55 +703,13 @@ export default function App() {
 //     }
 //   }, [user, isGuest, settings, setIsHeaderPinned, setShowWizard]); // Added setters to dependency array for completeness
 
-//   useEffect(() => {
-//     const handleScroll = () => {
-//       if (!isHeaderPinned)
-//         setScrollOpacity(Math.max(0, 1 - window.scrollY / 150));
-//       else setScrollOpacity(1);
-//     };
-//     window.addEventListener("scroll", handleScroll);
-//     return () => window.removeEventListener("scroll", handleScroll);
-//   }, [isHeaderPinned]);
-
-//   const togglePin = () => {
-//     const newState = !isHeaderPinned;
-//     setIsHeaderPinned(newState);
-//     localStorage.setItem("smartSpend_header_pinned", newState);
-//     if (newState) setScrollOpacity(1);
-//   };
-
 //   // --- 5. Data Processing (Original Logic) ---
-
-//   const netWorth = useMemo(
-//     () =>
-//       wealthItems.reduce(
-//         (acc, curr) => {
-//           const amt = parseFloat(curr.amount || 0);
-//           if (curr.type === "asset") acc.assets += amt;
-//           else acc.liabilities += amt;
-//           return acc;
-//         },
-//         { assets: 0, liabilities: 0 },
-//       ),
-//     [wealthItems],
-//   );
-
-//   const displayName = user?.displayName
-//     ? user.displayName.split(" ")[0]
-//     : "Guest";
 
 //   // --- 6. Handlers (Original Logic) ---
 
 // // Inside your main App.jsx
 
 // // Locate this function around line 250
-
-//   const requestDeleteTransaction = (id) =>
-//     triggerConfirm("Permanently delete?", () => deleteTransaction(id));
-//   const requestBulkDelete = (items) =>
-//     triggerConfirm(`Delete ${items.length} items?`, () =>
-//       bulkDeleteTransactions(items),
-//     );
 
 //   // --- 7. RENDER ---
 //   if (loading) return <Loading />;
@@ -1072,112 +1036,11 @@ export default function App() {
 //               exit={{ opacity: 0, scale: 0.98, x: -20 }}
 //               transition={{ duration: 0.3, ease: [0.19, 1, 0.22, 1] }} // Snappy Slide
 //             >
-//               {activeTab === TABS.HOME && (
-//                 <HomePage
-//                   transactions={transactions}
-//                   wealthItems={wealthItems}  // <--- ADD THIS LINE HERE
-//                   setActiveTab={setActiveTab}
-//                   onDelete={requestDeleteTransaction}
-//                   onUpdate={updateTransaction}
-//                   settings={settings}
-//                   theme={theme}
-//                 />
-//               )}
-//               {activeTab === TABS.HISTORY && (
-//                 <HistoryPage
-//                   transactions={transactions}
-//                   setActiveTab={setActiveTab}
-//                   onDelete={requestDeleteTransaction}
-//                   onBulkDelete={requestBulkDelete}
-//                   onUpdate={updateTransaction}
-//                 />
-//               )}
-//               {activeTab === TABS.ADD && (
-//                 <AddPage
-//                   user={user}
-//                   appId={appId}
-//                   setActiveTab={setActiveTab}
-//                   showToast={showToast}
-//                   triggerConfirm={triggerConfirm}
-//                 />
-//               )}
-//               {activeTab === TABS.AUDIT && (
-//                 <AuditPage
-//                   transactions={transactions}
-//                   wealthItems={wealthItems}
-//                   taxProfile={taxProfile}
-//                   onUpdateProfile={updateTaxProfile}
-//                   showToast={showToast}
-//                   settings={settings}
-//                   setActiveTab={setActiveTab}
-//                 />
-//               )}
-//               {activeTab === TABS.STATS && (
-//                 <StatsPage transactions={transactions} />
-//               )}
-//               {activeTab === TABS.WEALTH && (
-//                 <WealthPage
-//                   wealthItems={wealthItems}
-//                   user={user}
-//                   appId={appId}
-//                   showToast={showToast}
-//                   triggerConfirm={triggerConfirm}
-//                 />
-//               )}
-//               {activeTab === TABS.PROFILE && (
-//                 <ProfilePage
-//                   user={user}
-//                   settings={settings}
-//                   onUpdateSettings={updateSettings}
-//                   onSignOut={async () => {
-//                     await logout();
-//                     setActiveTab(TABS.HOME);
-//                   }}
-//                   showToast={showToast}
-//                   triggerConfirm={triggerConfirm}
-//                 />
-//               )}
-//               {activeTab === TABS.ITR && (
-//                 <ITRPage
-//                   user={user}
-//                   transactions={transactions}
-//                   setActiveTab={setActiveTab}
-//                   showToast={showToast}
-//                 />
-//               )}
+
 //             </motion.div>
 //           </AnimatePresence>
 
-//           {/* Footer Start */}
-//           <footer className="mt-32 pb-1 flex flex-col items-center justify-center gap-4 opacity-60 hover:opacity-100 transition-opacity duration-500">
-//             {/* Gradient Separator Line */}
-//             <div className="h-px w-48 bg-gradient-to-r from-transparent via-blue-500 to-transparent mb-2" />
-
-//             <div className="flex flex-col items-center gap-2 text-center">
-//               {/* Brand & Copyright - Increased to text-sm (14px) */}
-//               <p
-//                 className={cn(
-//                   "text-sm font-medium tracking-wide",
-//                   theme === "dark" ? "text-slate-400" : "text-slate-600",
-//                 )}
-//               >
-//                 &copy; {new Date().getFullYear()} Spendsy. All rights reserved.
-//               </p>
-
-//               {/* Version Badge - Increased to text-xs (12px) */}
-//               <div
-//                 className={cn(
-//                   "px-4 py-1.5 rounded-full text-xs font-mono tracking-widest uppercase border mt-2",
-//                   theme === "dark"
-//                     ? "bg-white/5 border-white/10 text-slate-500"
-//                     : "bg-slate-100 border-slate-200 text-slate-500",
-//                 )}
-//               >
-//                 {APP_VERSION}
-//               </div>
-//             </div>
-//           </footer>
-//           {/* Footer End */}
+//
 //         </main>
 //       </div>
 //     </div>
