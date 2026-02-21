@@ -99,7 +99,6 @@ python manage.py runserver
 
 ### Work to do
 - Upload feature in Add Page
-- ITR Page Database with Django in Audit page
 - AI Consultant feature in Audit page
 - Watchdog feature in Stats page
 - Assets/Liability item CRUD in Wealth page

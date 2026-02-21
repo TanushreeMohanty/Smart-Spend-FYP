@@ -42,7 +42,8 @@ def login_user(request):
         return Response({
             "message": "Login successful", 
             "user_id": user.id, 
-            "username": user.username
+            "username": user.username,
+            "email": user.email
         }, status=status.HTTP_200_OK)
     return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 

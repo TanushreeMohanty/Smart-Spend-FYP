@@ -104,7 +104,11 @@ export default function App() {
     [wealthItems],
   );
 
-  const firstName = currentUser?.username?.split(" ")[0] || "Guest";
+  const firstName =
+    currentUser?.username?.split(" ")[0] ||
+    currentUser?.displayName?.split(" ")[0] ||
+    "Guest";
+  const userEmail = currentUser?.email || "No email provided";
 
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";
@@ -223,6 +227,29 @@ export default function App() {
       fetchTaxProfile(); // Add this!
     }
   }, [currentUser?.id, fetchWealth, fetchTaxProfile]); // Add fetchTaxProfile to dependencies
+
+  // Inside your App() function, add this useEffect or update your existing one
+useEffect(() => {
+  if (currentUser?.id && !currentUser.email) {
+    // If we have an ID but no email, fetch the full profile from Django
+    const fetchFullProfile = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/profile/${currentUser.id}/`);
+        const data = await response.json();
+        if (response.ok) {
+          // Merge the existing user data with the new email/details from Django
+          setCurrentUser(prev => ({
+            ...prev,
+            email: data.email || data.user_email // Match your Django field name
+          }));
+        }
+      } catch (err) {
+        console.error("Could not fetch full user profile:", err);
+      }
+    };
+    fetchFullProfile();
+  }
+}, [currentUser?.id]);
 
   const deleteTransaction = async (id) => {
     try {
