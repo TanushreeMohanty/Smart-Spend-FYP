@@ -102,8 +102,8 @@ python manage.py runserver
 - AI Consultant feature in Audit page
 - Watchdog feature in Stats page
 - Assets/Liability item CRUD in Wealth page
-- User details in Profile page
 
+- host on render
 
 
 
