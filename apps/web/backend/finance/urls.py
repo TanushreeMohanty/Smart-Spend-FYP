@@ -28,4 +28,5 @@ urlpatterns = [
     # Handles PUT/PATCH for editing an item
     path('update-wealth/<int:item_id>/', views.update_wealth_item, name='update-wealth'),
     path('tax-profile/<int:user_id>/', views.manage_tax_profile, name='manage_tax_profile'),
+    path('itr-profile/<int:user_id>/', views.handle_itr_profile, name='itr_profile'),
 ]

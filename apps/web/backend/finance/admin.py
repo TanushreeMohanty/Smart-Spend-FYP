@@ -1,8 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import UserProfile, Transaction, WealthItem, TaxProfile
-
+from .models import UserProfile, Transaction, WealthItem, TaxProfile,ITRProfile
 # --- 1. INLINES ---
 # These allow you to edit profile/tax data directly on the User page
 class TaxProfileInline(admin.StackedInline): # Corrected inheritance
@@ -78,5 +77,25 @@ class TaxProfileAdmin(admin.ModelAdmin):
         }),
         ('Loan Interests', {
             'fields': ('home_loan_interest', 'education_loan_interest')
+        }),
+    )
+    
+@admin.register(ITRProfile)
+class ITRProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'tax_regime', 'updated_at', 'pan_number')
+    search_fields = ('user__username', 'pan_number')
+    
+    fieldsets = (
+        ('Header Information', {
+            'fields': ('user', 'tax_regime')
+        }),
+        ('Income Breakdown', {
+            'fields': (('salary', 'business_income'), ('house_property', 'capital_gains'), ('other_income', 'interest_income'))
+        }),
+        ('Tax Deductions', {
+            'fields': (('section_80c', 'section_80d'), ('section_80e', 'section_80g'), ('hra_deduction', 'home_loan_interest', 'nps_80ccd'))
+        }),
+        ('Identity & Bank Details', {
+            'fields': (('pan_number', 'aadhar_number'), ('bank_account', 'ifsc_code'), ('email', 'mobile'))
         }),
     )

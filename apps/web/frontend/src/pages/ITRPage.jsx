@@ -1,6 +1,6 @@
 //Database needed
 // ITR Wizard Page
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Wallet,
@@ -14,6 +14,7 @@ import {
   Info,
   AlertCircle,
   TrendingUp,
+  Save,
 } from "lucide-react";
 
 // --- TOOLTIP DATA & COMPONENT ---
@@ -49,11 +50,12 @@ const InfoTooltip = ({ field }) => (
   </div>
 );
 
-export const ITRCalculator = () => {
+export const ITRPage = ({ user, apiBaseUrl,showToast }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [taxRegime, setTaxRegime] = useState("new");
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Income State - UNTOUCHED
+  // --- STATE GROUPS ---
   const [income, setIncome] = useState({
     salary: "",
     houseProperty: "",
@@ -63,7 +65,6 @@ export const ITRCalculator = () => {
     interestIncome: "",
   });
 
-  // Deductions State - UNTOUCHED
   const [deductions, setDeductions] = useState({
     section80C: "",
     section80D: "",
@@ -74,7 +75,6 @@ export const ITRCalculator = () => {
     nps80CCD: "",
   });
 
-  // Filing Details State - UNTOUCHED
   const [filingDetails, setFilingDetails] = useState({
     panNumber: "",
     aadharNumber: "",
@@ -84,16 +84,83 @@ export const ITRCalculator = () => {
     mobile: "",
   });
 
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        // 1. Use the full Django URL (including trailing slash)
+        const response = await fetch(`${apiBaseUrl}/itr-data/${user.id}/`);
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // 2. Map Django model fields to your React state
+          // Django often returns fields like income_data, so we use || to keep defaults if null
+          if (data) {
+            setIncome((prev) => ({ ...prev, ...(data.income_data || {}) }));
+            setDeductions((prev) => ({
+              ...prev,
+              ...(data.deductions_data || {}),
+            }));
+            setFilingDetails((prev) => ({
+              ...prev,
+              ...(data.filing_details || {}),
+            }));
+            setTaxRegime(data.tax_regime || "new");
+          }
+        } else {
+          console.warn("User data not found, starting with empty form.");
+        }
+      } catch (error) {
+        // This usually happens if Django is not running or CORS is blocked
+        console.error("Connection to Django failed:", error);
+      }
+    };
+
+    fetchUserData();
+  }, []); // Empty dependency array is correct for initial mount
+
+  // 2. Save function
+  const saveProgress = async () => {
+    setIsSaving(true);
+    const payload = {
+      income,
+      deductions,
+      filingDetails,
+      taxRegime,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/itr-data/${user.id}/`, {
+        method: "POST", // Or PUT depending on your Django view
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        alert("Progress saved successfully!");
+      }
+    } catch (error) {
+      alert("Error saving data. Please check connection.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
   // Logic Functions - UNTOUCHED
   const calculateTotalIncome = () => {
     return Object.values(income).reduce(
       (sum, val) => sum + (parseFloat(val) || 0),
-      0
+      0,
     );
   };
 
+  const STANDARD_DEDUCTION = 75000;
+
   const calculateTotalDeductions = () => {
-    if (taxRegime === "new") return 0;
+    if (taxRegime === "new") {
+      return STANDARD_DEDUCTION; // ✅ New regime now gets the benefit
+    }
+
     const deductionLimits = {
       section80C: 150000,
       section80D: 75000,
@@ -103,11 +170,17 @@ export const ITRCalculator = () => {
       homeLoanInterest: 200000,
       nps80CCD: 50000,
     };
-    return Object.entries(deductions).reduce((sum, [key, val]) => {
-      const amount = parseFloat(val) || 0;
-      const limit = deductionLimits[key];
-      return sum + Math.min(amount, limit);
-    }, 0);
+
+    const totalOldDeductions = Object.entries(deductions).reduce(
+      (sum, [key, val]) => {
+        const amount = parseFloat(val) || 0;
+        const limit = deductionLimits[key];
+        return sum + Math.min(amount, limit);
+      },
+      0,
+    );
+
+    return totalOldDeductions + STANDARD_DEDUCTION; // ✅ Applied to Old regime too
   };
 
   const calculateOldRegimeTax = (taxableIncome) => {
@@ -198,12 +271,20 @@ export const ITRCalculator = () => {
               </p>
             </div>
           </div>
-          <div className="bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-tighter">
-              Live Audit
+
+          <button
+            onClick={saveProgress}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all"
+          >
+            {isSaving ? (
+              <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Save size={14} className="text-blue-400" />
+            )}
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
+              {isSaving ? "Saving..." : "Save Draft"}
             </span>
-          </div>
+          </button>
         </motion.div>
 
         {/* Liquid Stepper */}
@@ -212,7 +293,10 @@ export const ITRCalculator = () => {
           {steps.map((s) => (
             <motion.div
               key={s.id}
-              onClick={() => setCurrentStep(s.id)}
+              onClick={() => {
+                setCurrentStep(s.id);
+                saveProgress();
+              }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               className="flex flex-col items-center gap-2 cursor-pointer group"
@@ -252,6 +336,7 @@ export const ITRCalculator = () => {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
             >
+              {/* STEP 1: INCOME */}
               {currentStep === 1 && (
                 <div className="space-y-6">
                   <div className="flex items-center gap-2 mb-2">
@@ -263,10 +348,10 @@ export const ITRCalculator = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {Object.keys(income).map((key) => (
                       <div key={key} className="group transition-all">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2 ml-1 group-focus-within:text-blue-400 transition-colors">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2 ml-1 group-focus-within:text-blue-400">
                           {key.replace(/([A-Z])/g, " $1")}{" "}
                           <InfoTooltip field={key} />
-                        </p>
+                        </div>
                         <div className="relative">
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium italic">
                             ₹
@@ -277,7 +362,7 @@ export const ITRCalculator = () => {
                             onChange={(e) =>
                               handleInputChange("income", key, e.target.value)
                             }
-                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-white focus:border-blue-500/50 focus:bg-white/5 outline-none transition-all shadow-inner"
+                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-white focus:border-blue-500/50 outline-none transition-all shadow-inner"
                             placeholder="0.00"
                           />
                         </div>
@@ -287,22 +372,22 @@ export const ITRCalculator = () => {
                 </div>
               )}
 
+              {/* STEP 2: DEDUCTIONS */}
               {currentStep === 2 && (
                 <div className="space-y-6">
                   <div className="bg-amber-500/10 border border-amber-500/20 p-5 rounded-3xl flex gap-4 items-start shadow-lg">
                     <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                     <p className="text-[11px] text-amber-200/80 leading-relaxed font-medium">
-                      Note: These deductions are only valid for the Old Tax
-                      Regime.
+                      Note: Deductions only apply to the Old Tax Regime.
                     </p>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {Object.keys(deductions).map((key) => (
-                      <div key={key} className="space-y-2">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1">
+                      <div key={key} className="space-y-2 group">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1 group-focus-within:text-blue-400">
                           {key.replace(/([A-Z])/g, " $1")}{" "}
                           <InfoTooltip field={key} />
-                        </p>
+                        </div>
                         <div className="relative">
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
                             ₹
@@ -314,10 +399,10 @@ export const ITRCalculator = () => {
                               handleInputChange(
                                 "deductions",
                                 key,
-                                e.target.value
+                                e.target.value,
                               )
                             }
-                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-white focus:border-blue-500/50 focus:bg-white/5 outline-none transition-all shadow-inner disabled:opacity-30"
+                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-white focus:border-blue-500/50 outline-none transition-all shadow-inner"
                             placeholder="0.00"
                           />
                         </div>
@@ -327,6 +412,7 @@ export const ITRCalculator = () => {
                 </div>
               )}
 
+              {/* STEP 3: REGIME SELECTION */}
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <div className="mb-6 text-center">
@@ -350,7 +436,7 @@ export const ITRCalculator = () => {
                           className={`w-full p-6 rounded-[2rem] border-2 text-left transition-all relative overflow-hidden group ${
                             isSelected
                               ? "border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10"
-                              : "border-white/5 bg-white/5 hover:border-white/20"
+                              : "border-white/5 bg-white/5"
                           }`}
                         >
                           <div className="flex justify-between items-center mb-2">
@@ -368,7 +454,7 @@ export const ITRCalculator = () => {
                             {formatCurrency(
                               r === "old"
                                 ? results.oldRegimeTax
-                                : results.newRegimeTax
+                                : results.newRegimeTax,
                             )}
                           </div>
                           <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">
@@ -386,6 +472,7 @@ export const ITRCalculator = () => {
                 </div>
               )}
 
+              {/* STEP 4: SUMMARY */}
               {currentStep === 4 && (
                 <div className="space-y-8">
                   <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-8 rounded-[3rem] text-center shadow-2xl relative overflow-hidden">
@@ -401,7 +488,7 @@ export const ITRCalculator = () => {
                       {formatCurrency(
                         taxRegime === "old"
                           ? getTaxResults().oldRegimeTax
-                          : getTaxResults().newRegimeTax
+                          : getTaxResults().newRegimeTax,
                       )}
                     </motion.h2>
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-black/20 rounded-full border border-white/10">
@@ -411,7 +498,6 @@ export const ITRCalculator = () => {
                       </span>
                     </div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-white/5 border border-white/10 rounded-3xl p-5 shadow-inner">
                       <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">
@@ -433,26 +519,24 @@ export const ITRCalculator = () => {
                 </div>
               )}
 
+              {/* STEP 5: FILING DETAILS */}
               {currentStep === 5 && (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {Object.keys(filingDetails).map((key) => (
-                      <div key={key} className="space-y-2">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest ml-1">
+                      <div key={key} className="space-y-2 group">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest ml-1 group-focus-within:text-blue-400">
                           {key.replace(/([A-Z])/g, " $1")}{" "}
                           <InfoTooltip field={key} />
-                        </p>
+                        </div>
                         <input
                           type="text"
                           value={filingDetails[key]}
                           onChange={(e) =>
                             handleInputChange("filing", key, e.target.value)
                           }
-                          className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 px-6 text-white focus:border-blue-500 outline-none uppercase placeholder:lowercase"
-                          placeholder={`Enter your ${key.replace(
-                            /([A-Z])/g,
-                            " $1"
-                          )}`}
+                          className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 px-6 text-white focus:border-blue-500 outline-none uppercase placeholder:lowercase transition-all"
+                          placeholder={`Enter ${key.replace(/([A-Z])/g, " $1")}`}
                         />
                       </div>
                     ))}
@@ -475,7 +559,10 @@ export const ITRCalculator = () => {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => setCurrentStep(currentStep - 1)}
+                onClick={() => {
+                  setCurrentStep(currentStep - 1);
+                  saveProgress();
+                }}
                 className="flex-1 bg-white/5 border border-white/10 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center transition-colors hover:bg-white/10"
               >
                 <ChevronLeft size={20} className="mr-2" /> Previous
@@ -484,18 +571,21 @@ export const ITRCalculator = () => {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() =>
-                currentStep < 5
-                  ? setCurrentStep(currentStep + 1)
-                  : alert("Submission Successful!")
-              }
+              onClick={async () => {
+                await saveProgress();
+                if (currentStep < 5) {
+                  setCurrentStep(currentStep + 1);
+                } else {
+                  alert("ITR Filed & Data Synced with Database!");
+                }
+              }}
               className="flex-[2] bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-2xl shadow-blue-600/30 transition-all"
             >
               {currentStep === 4
                 ? "Review & File"
                 : currentStep === 5
-                ? "Submit Return"
-                : "Continue"}
+                  ? "Submit Return"
+                  : "Continue"}
               <ChevronRight size={18} />
             </motion.button>
           </div>
@@ -508,4 +598,4 @@ export const ITRCalculator = () => {
   );
 };
 
-export default ITRCalculator;
+export default ITRPage;

@@ -8,9 +8,12 @@ from rest_framework.response import Response
 from rest_framework import viewsets, status
 from django.db.models import Q
 
-from .models import Transaction, WealthItem, UserProfile, TaxProfile
-from .serializers import TaxProfileSerializer, TransactionSerializer, WealthItemSerializer, UserProfileSerializer
+from .models import Transaction, WealthItem, UserProfile, TaxProfile, ITRProfile
+from .serializers import TaxProfileSerializer
 from django.views.decorators.csrf import csrf_exempt # Add this import
+from django.http import JsonResponse
+import json
+
 # --- AUTH ENDPOINTS ---
 
 @api_view(['POST'])
@@ -315,9 +318,63 @@ def save_tax_profile(request):
         serializer.save()
         return Response(serializer.data, status=201)
     return Response(serializer.errors, status=400)
+
+@csrf_exempt
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def handle_itr_profile(request, user_id):
+    # GET: Load existing data
+    if request.method == "GET":
+        profile, created = ITRProfile.objects.get_or_create(user_id=user_id)
+        return JsonResponse({
+            "taxRegime": profile.tax_regime,
+            "income": {
+                "salary": profile.salary, "houseProperty": profile.house_property,
+                "businessIncome": profile.business_income, "capitalGains": profile.capital_gains,
+                "otherIncome": profile.other_income, "interestIncome": profile.interest_income
+            },
+            "deductions": {
+                "section80C": profile.section_80c, "section80D": profile.section_80d,
+                "section80E": profile.section_80e, "section80G": profile.section_80g,
+                "hra": profile.hra_deduction, "homeLoanInterest": profile.home_loan_interest,
+                "nps80CCD": profile.nps_80ccd
+            },
+            "filingDetails": {
+                "panNumber": profile.pan_number, "aadharNumber": profile.aadhar_number,
+                "bankAccount": profile.bank_account, "ifscCode": profile.ifsc_code,
+                "email": profile.email, "mobile": profile.mobile
+            }
+        })
+
+    # POST: Update profile data
+    elif request.method == "POST":
+        data = json.loads(request.body)
+        profile, _ = ITRProfile.objects.get_or_create(user_id=user_id)
+        
+        profile.tax_regime = data.get('taxRegime', 'new')
+        
+        # Mapping frontend names to backend fields
+        inc = data.get('income', {})
+        profile.salary = inc.get('salary', 0)
+        profile.business_income = inc.get('businessIncome', 0)
+        # ... map all income fields ...
+
+        ded = data.get('deductions', {})
+        profile.section_80c = ded.get('section80C', 0)
+        # ... map all deduction fields ...
+
+        filing = data.get('filingDetails', {})
+        profile.pan_number = filing.get('panNumber', "")
+        # ... map all filing fields ...
+
+        profile.save()
+        return JsonResponse({"status": "success", "message": "ITR data saved!"})
+    
+    
 # Health Check Endpoint
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def health_check(request):
     return Response({"message": "Finance app is working :)"})
+

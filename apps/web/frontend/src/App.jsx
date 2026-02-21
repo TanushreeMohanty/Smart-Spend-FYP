@@ -172,17 +172,16 @@ export default function App() {
   const fetchTaxProfile = useCallback(async () => {
     if (!currentUser?.id) return;
     try {
+      // Ensure this matches your Django urls.py exactly
       const response = await fetch(
         `${API_BASE_URL}/tax-profile/${currentUser.id}/`,
       );
 
       if (response.ok) {
         const data = await response.json();
+        // If Django returns a single object, but your state expects initialDefaultProfile keys:
         setTaxProfile(data);
         localStorage.setItem("tax_profile", JSON.stringify(data));
-      } else if (response.status === 404) {
-        // Normal for new users: Just keep using the initialDefaultProfile
-        console.log("No profile found on server, using local defaults.");
       }
     } catch (e) {
       console.error("Network error during tax profile sync", e);
@@ -571,6 +570,7 @@ export default function App() {
                   showToast={showToast}
                   settings={settings}
                   setActiveTab={setActiveTab}
+                  refreshProfile={fetchTaxProfile} // Add this
                 />
               )}
 
@@ -581,23 +581,12 @@ export default function App() {
               {activeTab === TABS.ITR && (
                 <ITRPage
                   user={currentUser}
+                  apiBaseUrl={API_BASE_URL} // Pass the base URL here
                   transactions={transactions}
                   setActiveTab={setActiveTab}
                   showToast={showToast}
                 />
               )}
-              {activeTab !== TABS.HOME &&
-                activeTab !== TABS.HISTORY &&
-                activeTab !== TABS.ADD &&
-                activeTab !== TABS.PROFILE &&
-                activeTab !== TABS.WEALTH &&
-                activeTab !== TABS.AUDIT &&
-                activeTab !== TABS.STATS &&
-                activeTab !== TABS.ITR && (
-                  <div className="text-center py-20 opacity-40 italic">
-                    {activeTab} Page is under construction.
-                  </div>
-                )}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -687,8 +676,6 @@ export default function App() {
 //       }
 //     };
 //     loadPdfWorker();
-
-
 
 //     // 3. ONBOARDING WIZARD TRIGGER
 //     // Logic: Only show if user is fully logged in, not a guest,
