@@ -239,31 +239,6 @@ const ProfileWizard = ({
 };
 
 // Inside your AuditPage or parent component
-const onUpdateProfile = async (localProfile) => {
-  try {
-    // In React
-    const userId = localStorage.getItem("user_id"); // Or however you store it
-    const response = await fetch(
-      `http://127.0.0.1:8000/api/tax-profile/${userId}/`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(localProfile),
-      },
-    );
-
-    if (response.ok) {
-      const savedData = await response.json();
-      // Only after a successful 200 OK from Django, update the UI
-      setTaxProfile(savedData);
-      console.log("Data successfully stored in DB!");
-    } else {
-      console.error("Server refused the data. Status:", response.status);
-    }
-  } catch (error) {
-    console.error("Network error - is Django running?", error);
-  }
-};
 const AuditPage = ({
   transactions,
   wealthItems,

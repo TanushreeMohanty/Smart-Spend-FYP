@@ -69,10 +69,7 @@ export default function App() {
       return initialDefaultProfile;
     }
   });
-  const [isHeaderPinned, setIsHeaderPinned] = useState(
-    () => localStorage.getItem("smartSpend_header_pinned") === "true",
-  );
-  const [scrollOpacity, setScrollOpacity] = useState(1);
+
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     message: "",
@@ -107,32 +104,13 @@ export default function App() {
     [wealthItems],
   );
 
-  const displayName = currentUser?.username
-    ? currentUser.username.split(" ")[0]
-    : "Guest";
+  const firstName = currentUser?.username?.split(" ")[0] || "Guest";
 
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";
     setTheme(newTheme);
     localStorage.setItem("app_theme", newTheme);
   };
-
-  const togglePin = () => {
-    const newState = !isHeaderPinned;
-    setIsHeaderPinned(newState);
-    localStorage.setItem("smartSpend_header_pinned", newState);
-    if (newState) setScrollOpacity(1);
-  };
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!isHeaderPinned)
-        setScrollOpacity(Math.max(0, 1 - window.scrollY / 150));
-      else setScrollOpacity(1);
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [isHeaderPinned]);
 
   const showToast = useCallback((msg, type = "info") => {
     setToast({ show: true, msg, type });
@@ -157,9 +135,8 @@ export default function App() {
 
   async function fetchHistory() {
     if (!currentUser?.id) return;
-    const response = await fetch(
-      `http://127.0.0.1:8000/api/finance/history/${currentUser.id}/`,
-    );
+    // Use the constant!
+    const response = await fetch(`${API_BASE_URL}/history/${currentUser.id}/`);
     const data = await response.json();
     setTransactions(data);
   }
@@ -192,55 +169,52 @@ export default function App() {
     }
   }, [currentUser?.id, showToast]);
 
-const fetchTaxProfile = useCallback(async () => {
-  if (!currentUser?.id) return;
-  try {
-    const response = await fetch(`http://127.0.0.1:8000/api/tax-profile/${currentUser.id}/`);
-    
-    if (response.ok) {
-      const data = await response.json();
-      setTaxProfile(data);
-      localStorage.setItem("tax_profile", JSON.stringify(data));
-    } else if (response.status === 404) {
-      // Normal for new users: Just keep using the initialDefaultProfile
-      console.log("No profile found on server, using local defaults.");
-    }
-  } catch (e) {
-    console.error("Network error during tax profile sync", e);
-  }
-}, [currentUser?.id]);
+  const fetchTaxProfile = useCallback(async () => {
+    if (!currentUser?.id) return;
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/tax-profile/${currentUser.id}/`,
+      );
 
-const updateTaxProfile = async (localProfile) => {
-  // Use the ID from state instead of localStorage for consistency
-  const userId = currentUser?.id || localStorage.getItem("user_id");
-
-  if (!userId) {
-    showToast("Error: User session not found.", "error");
-    return;
-  }
-
-  try {
-    const response = await fetch(
-      `http://127.0.0.1:8000/api/tax-profile/${userId}/`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(localProfile),
+      if (response.ok) {
+        const data = await response.json();
+        setTaxProfile(data);
+        localStorage.setItem("tax_profile", JSON.stringify(data));
+      } else if (response.status === 404) {
+        // Normal for new users: Just keep using the initialDefaultProfile
+        console.log("No profile found on server, using local defaults.");
       }
-    );
-
-    if (response.ok) {
-      const savedData = await response.json();
-      setTaxProfile(savedData);
-      localStorage.setItem("tax_profile", JSON.stringify(savedData));
-      showToast("Profile synced with server!", "success");
-    } else {
-      showToast("Server refused update", "error");
+    } catch (e) {
+      console.error("Network error during tax profile sync", e);
     }
-  } catch (error) {
-    showToast("Network error", "error");
-  }
-};
+  }, [currentUser?.id]);
+
+  const updateTaxProfile = async (localProfile) => {
+    if (!currentUser?.id) {
+      showToast("Session expired. Please login again.", "error");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/tax-profile/${currentUser.id}/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(localProfile),
+        },
+      );
+
+      if (response.ok) {
+        const savedData = await response.json();
+        setTaxProfile(savedData);
+        localStorage.setItem("tax_profile", JSON.stringify(savedData));
+        showToast("Profile synced!", "success");
+      }
+    } catch (error) {
+      showToast("Network error", "error");
+    }
+  };
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -251,16 +225,15 @@ const updateTaxProfile = async (localProfile) => {
     }
   }, [currentUser?.id, fetchWealth, fetchTaxProfile]); // Add fetchTaxProfile to dependencies
 
-
   const deleteTransaction = async (id) => {
     try {
+      // Use the constant!
       const response = await fetch(
-        `http://127.0.0.1:8000/api/finance/delete-transaction/${id}/`,
+        `${API_BASE_URL}/delete-transaction/${id}/`,
         {
           method: "DELETE",
         },
       );
-
       if (response.ok) {
         setTransactions((prev) => prev.filter((t) => t.id !== id));
       }
@@ -371,7 +344,6 @@ const updateTaxProfile = async (localProfile) => {
     }
   };
 
-
   const handleWizardComplete = async (wizardData) => {
     const success = await saveSettings(wizardData);
     if (success) setShowWizard(false);
@@ -422,7 +394,12 @@ const updateTaxProfile = async (localProfile) => {
       <Navigation
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onSignOut={() => setCurrentUser(null)}
+        onSignOut={() => {
+          setCurrentUser(null);
+          setTransactions([]);
+          setWealthItems([]);
+          localStorage.removeItem("tax_profile"); // Clean up sensitive tax data
+        }}
       />
       <WelcomeWizard isOpen={showWizard} onComplete={handleWizardComplete} />
       <ConfirmationDialog
@@ -440,9 +417,7 @@ const updateTaxProfile = async (localProfile) => {
                 Spendsy
               </span>
             </div>
-            <h1 className="text-5xl font-black">
-              Hello, {currentUser.username?.split(" ")[0]}
-            </h1>
+            <h1 className="text-5xl font-black">Hello, {firstName}</h1>
           </div>
           <div className="flex gap-3">
             <button
@@ -713,11 +688,7 @@ const updateTaxProfile = async (localProfile) => {
 //     };
 //     loadPdfWorker();
 
-//     // 2. HEADER PIN PREFERENCE
-//     const savedPin = localStorage.getItem("smartSpend_header_pinned");
-//     if (savedPin !== null) {
-//       setIsHeaderPinned(savedPin === "true");
-//     }
+
 
 //     // 3. ONBOARDING WIZARD TRIGGER
 //     // Logic: Only show if user is fully logged in, not a guest,
@@ -1066,29 +1037,6 @@ const updateTaxProfile = async (localProfile) => {
 //               transition={{ duration: 0.3, ease: [0.19, 1, 0.22, 1] }} // Snappy Slide
 //             >
 
-//               {activeTab === TABS.AUDIT && (
-//                 <AuditPage
-//                   transactions={transactions}
-//                   wealthItems={wealthItems}
-//                   taxProfile={taxProfile}
-//                   onUpdateProfile={updateTaxProfile}
-//                   showToast={showToast}
-//                   settings={settings}
-//                   setActiveTab={setActiveTab}
-//                 />
-//               )}
-//               {activeTab === TABS.STATS && (
-//                 <StatsPage transactions={transactions} />
-//               )}
-
-//               {activeTab === TABS.ITR && (
-//                 <ITRPage
-//                   user={user}
-//                   transactions={transactions}
-//                   setActiveTab={setActiveTab}
-//                   showToast={showToast}
-//                 />
-//               )}
 //             </motion.div>
 //           </AnimatePresence>
 
