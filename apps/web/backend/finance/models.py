@@ -75,41 +75,27 @@ class TaxProfile(models.Model):
     def __str__(self):
         return f"Tax Profile for {self.user.username}"
     
-class ITRProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='itr_profile')
-    tax_regime = models.CharField(max_length=10, default='new', choices=[('new', 'New'), ('old', 'Old')])
+class ITRData(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="itr_profile")
     
-    # Income Details
-    salary = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    house_property = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    business_income = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    capital_gains = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    other_income = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    interest_income = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-
-    # Deductions
-    section_80c = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    section_80d = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    section_80e = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    section_80g = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    hra_deduction = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    home_loan_interest = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    nps_80ccd = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-
-    # Filing Details (Encrypted or sensitive-ready)
-    pan_number = models.CharField(max_length=10, blank=True)
-    aadhar_number = models.CharField(max_length=12, blank=True)
-    bank_account = models.CharField(max_length=20, blank=True)
-    ifsc_code = models.CharField(max_length=11, blank=True)
-    email = models.EmailField(blank=True)
-    mobile = models.CharField(max_length=15, blank=True)
-
+    # Stores: salary, houseProperty, businessIncome, capitalGains, otherIncome, interestIncome
+    income_data = models.JSONField(default=dict, blank=True)
+    
+    # Stores: section80C, section80D, section80E, section80G, hra, homeLoanInterest, nps80CCD
+    deductions_data = models.JSONField(default=dict, blank=True)
+    
+    # Stores: panNumber, aadharNumber, bankAccount, ifscCode, email, mobile
+    filing_details = models.JSONField(default=dict, blank=True)
+    
+    # Tracks the user's choice: 'new' or 'old'
+    tax_regime = models.CharField(max_length=10, default="new", choices=[('new', 'New'), ('old', 'Old')])
+    
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name = "ITR Data"
+        verbose_name_plural = "ITR Data Profiles"
+
     def __str__(self):
-        return f"ITR Profile - {self.user.username}"    
-    
-    
-    
-    
-    
+        return f"ITR Profile: {self.user.username} ({self.tax_regime.upper()})"
+   

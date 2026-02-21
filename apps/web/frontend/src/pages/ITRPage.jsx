@@ -1,5 +1,3 @@
-//Database needed
-// ITR Wizard Page
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -17,7 +15,7 @@ import {
   Save,
 } from "lucide-react";
 
-// --- TOOLTIP DATA & COMPONENT ---
+// --- TOOLTIP DATA ---
 const HELP_TEXTS = {
   salary: "Sum of Basic, HRA, and Special Allowance from Form 16.",
   houseProperty: "Income from self-occupied or let-out property.",
@@ -50,10 +48,11 @@ const InfoTooltip = ({ field }) => (
   </div>
 );
 
-export const ITRPage = ({ user, apiBaseUrl,showToast }) => {
+export const ITRPage = ({ user, apiBaseUrl }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [taxRegime, setTaxRegime] = useState("new");
   const [isSaving, setIsSaving] = useState(false);
+  const [dbStatus, setDbStatus] = useState("checking");
 
   // --- STATE GROUPS ---
   const [income, setIncome] = useState({
@@ -84,111 +83,82 @@ export const ITRPage = ({ user, apiBaseUrl,showToast }) => {
     mobile: "",
   });
 
+  // --- 1. DATABASE FETCH (GET) ---
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        // 1. Use the full Django URL (including trailing slash)
+        // Path matches your Django finance urls
         const response = await fetch(`${apiBaseUrl}/itr-data/${user.id}/`);
-
         if (response.ok) {
           const data = await response.json();
-
-          // 2. Map Django model fields to your React state
-          // Django often returns fields like income_data, so we use || to keep defaults if null
           if (data) {
             setIncome((prev) => ({ ...prev, ...(data.income_data || {}) }));
-            setDeductions((prev) => ({
-              ...prev,
-              ...(data.deductions_data || {}),
-            }));
-            setFilingDetails((prev) => ({
-              ...prev,
-              ...(data.filing_details || {}),
-            }));
+            setDeductions((prev) => ({ ...prev, ...(data.deductions_data || {}) }));
+            setFilingDetails((prev) => ({ ...prev, ...(data.filing_details || {}) }));
             setTaxRegime(data.tax_regime || "new");
+            setDbStatus("online");
           }
         } else {
-          console.warn("User data not found, starting with empty form.");
+          setDbStatus("new_profile");
         }
       } catch (error) {
-        // This usually happens if Django is not running or CORS is blocked
-        console.error("Connection to Django failed:", error);
+        setDbStatus("offline");
       }
     };
-
     fetchUserData();
-  }, []); // Empty dependency array is correct for initial mount
+  }, [user.id, apiBaseUrl]);
 
-  // 2. Save function
+  // --- 2. DATABASE SAVE (POST) ---
   const saveProgress = async () => {
     setIsSaving(true);
     const payload = {
-      income,
-      deductions,
-      filingDetails,
-      taxRegime,
-      updatedAt: new Date().toISOString(),
+      income_data: income,
+      deductions_data: deductions,
+      filing_details: filingDetails,
+      tax_regime: taxRegime,
     };
 
     try {
       const response = await fetch(`${apiBaseUrl}/itr-data/${user.id}/`, {
-        method: "POST", // Or PUT depending on your Django view
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        alert("Progress saved successfully!");
+        setDbStatus("online");
+      } else {
+        setDbStatus("error");
       }
     } catch (error) {
-      alert("Error saving data. Please check connection.");
+      setDbStatus("offline");
     } finally {
       setIsSaving(false);
     }
   };
-  // Logic Functions - UNTOUCHED
-  const calculateTotalIncome = () => {
-    return Object.values(income).reduce(
-      (sum, val) => sum + (parseFloat(val) || 0),
-      0,
-    );
-  };
 
+  // --- TAX LOGIC ---
+  const calculateTotalIncome = () => Object.values(income).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
   const STANDARD_DEDUCTION = 75000;
 
   const calculateTotalDeductions = () => {
-    if (taxRegime === "new") {
-      return STANDARD_DEDUCTION; // ✅ New regime now gets the benefit
-    }
-
+    if (taxRegime === "new") return STANDARD_DEDUCTION;
     const deductionLimits = {
-      section80C: 150000,
-      section80D: 75000,
-      section80E: Infinity,
-      section80G: Infinity,
-      hra: Infinity,
-      homeLoanInterest: 200000,
-      nps80CCD: 50000,
+      section80C: 150000, section80D: 75000, section80E: Infinity,
+      section80G: Infinity, hra: Infinity, homeLoanInterest: 200000, nps80CCD: 50000,
     };
-
-    const totalOldDeductions = Object.entries(deductions).reduce(
-      (sum, [key, val]) => {
-        const amount = parseFloat(val) || 0;
-        const limit = deductionLimits[key];
-        return sum + Math.min(amount, limit);
-      },
-      0,
-    );
-
-    return totalOldDeductions + STANDARD_DEDUCTION; // ✅ Applied to Old regime too
+    const totalOldDeductions = Object.entries(deductions).reduce((sum, [key, val]) => {
+      const amount = parseFloat(val) || 0;
+      return sum + Math.min(amount, deductionLimits[key] || Infinity);
+    }, 0);
+    return totalOldDeductions + STANDARD_DEDUCTION;
   };
 
   const calculateOldRegimeTax = (taxableIncome) => {
     let tax = 0;
     if (taxableIncome <= 250000) tax = 0;
     else if (taxableIncome <= 500000) tax = (taxableIncome - 250000) * 0.05;
-    else if (taxableIncome <= 1000000)
-      tax = 12500 + (taxableIncome - 500000) * 0.2;
+    else if (taxableIncome <= 1000000) tax = 12500 + (taxableIncome - 500000) * 0.2;
     else tax = 112500 + (taxableIncome - 1000000) * 0.3;
     if (taxableIncome <= 500000) tax = Math.max(0, tax - 12500);
     return tax * 1.04;
@@ -196,15 +166,14 @@ export const ITRPage = ({ user, apiBaseUrl,showToast }) => {
 
   const calculateNewRegimeTax = (totalIncome) => {
     let tax = 0;
-    if (totalIncome <= 300000) tax = 0;
-    else if (totalIncome <= 600000) tax = (totalIncome - 300000) * 0.05;
-    else if (totalIncome <= 900000) tax = 15000 + (totalIncome - 600000) * 0.1;
-    else if (totalIncome <= 1200000)
-      tax = 45000 + (totalIncome - 900000) * 0.15;
-    else if (totalIncome <= 1500000)
-      tax = 90000 + (totalIncome - 1200000) * 0.2;
-    else tax = 150000 + (totalIncome - 1500000) * 0.3;
-    if (totalIncome <= 700000) tax = Math.max(0, tax - 25000);
+    const adjustedIncome = totalIncome - STANDARD_DEDUCTION;
+    if (adjustedIncome <= 300000) tax = 0;
+    else if (adjustedIncome <= 600000) tax = (adjustedIncome - 300000) * 0.05;
+    else if (adjustedIncome <= 900000) tax = 15000 + (adjustedIncome - 600000) * 0.1;
+    else if (adjustedIncome <= 1200000) tax = 45000 + (adjustedIncome - 900000) * 0.15;
+    else if (adjustedIncome <= 1500000) tax = 90000 + (adjustedIncome - 1200000) * 0.2;
+    else tax = 150000 + (adjustedIncome - 1500000) * 0.3;
+    if (adjustedIncome <= 700000) tax = 0;
     return tax * 1.04;
   };
 
@@ -215,31 +184,18 @@ export const ITRPage = ({ user, apiBaseUrl,showToast }) => {
     const oldRegimeTax = calculateOldRegimeTax(taxableIncome);
     const newRegimeTax = calculateNewRegimeTax(totalIncome);
     return {
-      totalIncome,
-      totalDeductions,
-      taxableIncome,
-      oldRegimeTax,
-      newRegimeTax,
+      totalIncome, totalDeductions, taxableIncome, oldRegimeTax, newRegimeTax,
       recommendedRegime: oldRegimeTax < newRegimeTax ? "old" : "new",
-      savingsWithRecommended: Math.abs(oldRegimeTax - newRegimeTax),
     };
   };
 
   const handleInputChange = (category, field, value) => {
     if (category === "income") setIncome({ ...income, [field]: value });
-    else if (category === "deductions")
-      setDeductions({ ...deductions, [field]: value });
-    else if (category === "filing")
-      setFilingDetails({ ...filingDetails, [field]: value });
+    else if (category === "deductions") setDeductions({ ...deductions, [field]: value });
+    else if (category === "filing") setFilingDetails({ ...filingDetails, [field]: value });
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  const formatCurrency = (amount) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
 
   const steps = [
     { id: 1, label: "Income", icon: <Wallet size={16} /> },
@@ -252,119 +208,54 @@ export const ITRPage = ({ user, apiBaseUrl,showToast }) => {
   return (
     <div className="min-h-screen bg-transparent text-slate-200 pb-20 overflow-x-hidden">
       <div className="max-w-2xl mx-auto space-y-8 px-2">
-        {/* Modern Header Section */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between bg-white/5 p-6 rounded-[2.5rem] border border-white/10 backdrop-blur-xl shadow-2xl"
-        >
+        {/* Header with Sync Status */}
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between bg-white/5 p-6 rounded-[2.5rem] border border-white/10 backdrop-blur-xl shadow-2xl">
           <div className="flex items-center gap-4">
             <div className="bg-gradient-to-br from-blue-500 to-cyan-400 p-3 rounded-2xl shadow-lg shadow-blue-500/20">
               <FileText className="text-slate-900 w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">
-                ITR Wizard
-              </h1>
-              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em]">
-                AY 2025-26 • Secure
-              </p>
+              <h1 className="text-xl font-bold text-white tracking-tight">ITR Wizard</h1>
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${dbStatus === 'online' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-[0.2em]">{dbStatus}</p>
+              </div>
             </div>
           </div>
-
-          <button
-            onClick={saveProgress}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all"
-          >
-            {isSaving ? (
-              <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Save size={14} className="text-blue-400" />
-            )}
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
-              {isSaving ? "Saving..." : "Save Draft"}
-            </span>
+          <button onClick={saveProgress} className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all">
+            {isSaving ? <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" /> : <Save size={14} className="text-blue-400" />}
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">{isSaving ? "Saving..." : "Save Draft"}</span>
           </button>
         </motion.div>
 
-        {/* Liquid Stepper */}
+        {/* Stepper */}
         <div className="flex justify-between items-center relative px-4">
           <div className="absolute h-[2px] bg-white/5 left-8 right-8 top-5 -z-10" />
           {steps.map((s) => (
-            <motion.div
-              key={s.id}
-              onClick={() => {
-                setCurrentStep(s.id);
-                saveProgress();
-              }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex flex-col items-center gap-2 cursor-pointer group"
-            >
-              <motion.div
-                animate={{
-                  scale: currentStep === s.id ? 1.2 : 1,
-                  backgroundColor:
-                    currentStep >= s.id ? "#2563eb" : "rgba(255,255,255,0.05)",
-                }}
-                className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors shadow-xl ${
-                  currentStep >= s.id
-                    ? "text-white shadow-blue-900/40"
-                    : "text-slate-600 border border-white/5"
-                } group-hover:opacity-80`}
-              >
+            <motion.div key={s.id} onClick={() => { setCurrentStep(s.id); saveProgress(); }} className="flex flex-col items-center gap-2 cursor-pointer group">
+              <motion.div animate={{ scale: currentStep === s.id ? 1.2 : 1, backgroundColor: currentStep >= s.id ? "#2563eb" : "rgba(255,255,255,0.05)" }} className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors shadow-xl ${currentStep >= s.id ? "text-white" : "text-slate-600 border border-white/5"}`}>
                 {currentStep > s.id ? <CheckCircle2 size={18} /> : s.icon}
               </motion.div>
-              <span
-                className={`text-[9px] font-black uppercase tracking-widest transition-colors ${
-                  currentStep === s.id ? "text-blue-400" : "text-slate-600"
-                } group-hover:text-blue-300`}
-              >
-                {s.label}
-              </span>
+              <span className={`text-[9px] font-black uppercase tracking-widest ${currentStep === s.id ? "text-blue-400" : "text-slate-600"}`}>{s.label}</span>
             </motion.div>
           ))}
         </div>
 
-        {/* Content Container */}
-        <div className="bg-white/5 border border-white/10 rounded-[3rem] p-8 backdrop-blur-2xl shadow-2xl relative overflow-hidden min-h-[450px]">
+        {/* Form Content */}
+        <div className="bg-white/5 border border-white/10 rounded-[3rem] p-8 backdrop-blur-2xl shadow-2xl min-h-[450px]">
           <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-            >
-              {/* STEP 1: INCOME */}
+            <motion.div key={currentStep} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              
               {currentStep === 1 && (
                 <div className="space-y-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp size={16} className="text-blue-400" />
-                    <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">
-                      Income Declaration
-                    </h2>
-                  </div>
+                  <div className="flex items-center gap-2 mb-2"><TrendingUp size={16} className="text-blue-400" /><h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Income Declaration</h2></div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {Object.keys(income).map((key) => (
                       <div key={key} className="group transition-all">
-                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2 ml-1 group-focus-within:text-blue-400">
-                          {key.replace(/([A-Z])/g, " $1")}{" "}
-                          <InfoTooltip field={key} />
-                        </div>
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2 ml-1 group-focus-within:text-blue-400">{key.replace(/([A-Z])/g, " $1")} <InfoTooltip field={key} /></div>
                         <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium italic">
-                            ₹
-                          </span>
-                          <input
-                            type="number"
-                            value={income[key]}
-                            onChange={(e) =>
-                              handleInputChange("income", key, e.target.value)
-                            }
-                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-white focus:border-blue-500/50 outline-none transition-all shadow-inner"
-                            placeholder="0.00"
-                          />
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium italic">₹</span>
+                          <input type="number" value={income[key]} onChange={(e) => handleInputChange("income", key, e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-white focus:border-blue-500/50 outline-none transition-all shadow-inner" placeholder="0.00" />
                         </div>
                       </div>
                     ))}
@@ -372,39 +263,19 @@ export const ITRPage = ({ user, apiBaseUrl,showToast }) => {
                 </div>
               )}
 
-              {/* STEP 2: DEDUCTIONS */}
               {currentStep === 2 && (
                 <div className="space-y-6">
                   <div className="bg-amber-500/10 border border-amber-500/20 p-5 rounded-3xl flex gap-4 items-start shadow-lg">
                     <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-200/80 leading-relaxed font-medium">
-                      Note: Deductions only apply to the Old Tax Regime.
-                    </p>
+                    <p className="text-[11px] text-amber-200/80 leading-relaxed font-medium">Note: Deductions primarily benefit the Old Tax Regime. The New Regime includes a standard deduction of ₹75,000.</p>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {Object.keys(deductions).map((key) => (
                       <div key={key} className="space-y-2 group">
-                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1 group-focus-within:text-blue-400">
-                          {key.replace(/([A-Z])/g, " $1")}{" "}
-                          <InfoTooltip field={key} />
-                        </div>
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1 group-focus-within:text-blue-400">{key.replace(/([A-Z])/g, " $1")} <InfoTooltip field={key} /></div>
                         <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-                            ₹
-                          </span>
-                          <input
-                            type="number"
-                            value={deductions[key]}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "deductions",
-                                key,
-                                e.target.value,
-                              )
-                            }
-                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-white focus:border-blue-500/50 outline-none transition-all shadow-inner"
-                            placeholder="0.00"
-                          />
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">₹</span>
+                          <input type="number" value={deductions[key]} onChange={(e) => handleInputChange("deductions", key, e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-white focus:border-blue-500/50 outline-none transition-all shadow-inner" placeholder="0.00" />
                         </div>
                       </div>
                     ))}
@@ -412,187 +283,64 @@ export const ITRPage = ({ user, apiBaseUrl,showToast }) => {
                 </div>
               )}
 
-              {/* STEP 3: REGIME SELECTION */}
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <div className="mb-6 text-center">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-2">
-                      Comparison Engine
-                    </p>
-                    <h2 className="text-xl font-bold text-white">
-                      Select Your Regime
-                    </h2>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-2">Comparison Engine</p>
+                    <h2 className="text-xl font-bold text-white">Select Your Regime</h2>
                   </div>
                   <div className="space-y-4">
                     {["new", "old"].map((r) => {
                       const results = getTaxResults();
                       const isSelected = taxRegime === r;
-                      const isRecommended = results.recommendedRegime === r;
                       return (
-                        <motion.button
-                          whileTap={{ scale: 0.98 }}
-                          key={r}
-                          onClick={() => setTaxRegime(r)}
-                          className={`w-full p-6 rounded-[2rem] border-2 text-left transition-all relative overflow-hidden group ${
-                            isSelected
-                              ? "border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10"
-                              : "border-white/5 bg-white/5"
-                          }`}
-                        >
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-black text-white uppercase text-[10px] tracking-[0.2em]">
-                              {r} Tax Regime
-                            </span>
-                            {isSelected && (
-                              <CheckCircle2
-                                className="text-blue-400"
-                                size={24}
-                              />
-                            )}
-                          </div>
-                          <div className="text-3xl font-bold text-white tracking-tighter">
-                            {formatCurrency(
-                              r === "old"
-                                ? results.oldRegimeTax
-                                : results.newRegimeTax,
-                            )}
-                          </div>
-                          <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">
-                            Payable Tax Liability
-                          </p>
-                          {isRecommended && (
-                            <div className="absolute top-0 right-0 bg-emerald-500 text-slate-900 text-[8px] font-black px-4 py-1.5 rounded-bl-2xl uppercase tracking-[0.1em]">
-                              Recommended Saving
-                            </div>
-                          )}
-                        </motion.button>
+                        <button key={r} onClick={() => setTaxRegime(r)} className={`w-full p-6 rounded-[2rem] border-2 text-left transition-all relative overflow-hidden ${isSelected ? "border-blue-500 bg-blue-500/10" : "border-white/5 bg-white/5"}`}>
+                          <div className="flex justify-between items-center mb-2"><span className="font-black text-white uppercase text-[10px] tracking-[0.2em]">{r} Regime</span>{isSelected && <CheckCircle2 className="text-blue-400" size={24} />}</div>
+                          <div className="text-3xl font-bold text-white tracking-tighter">{formatCurrency(r === "old" ? results.oldRegimeTax : results.newRegimeTax)}</div>
+                          {results.recommendedRegime === r && <div className="absolute top-0 right-0 bg-emerald-500 text-slate-900 text-[8px] font-black px-4 py-1.5 rounded-bl-2xl uppercase tracking-widest">Recommended</div>}
+                        </button>
                       );
                     })}
                   </div>
                 </div>
               )}
 
-              {/* STEP 4: SUMMARY */}
               {currentStep === 4 && (
-                <div className="space-y-8">
-                  <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-8 rounded-[3rem] text-center shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16" />
-                    <p className="text-blue-100 text-[10px] uppercase font-black tracking-[0.3em] mb-3 opacity-80">
-                      Final Calculated Due
-                    </p>
-                    <motion.h2
-                      initial={{ scale: 0.9 }}
-                      animate={{ scale: 1 }}
-                      className="text-5xl font-black text-white tracking-tighter mb-4"
-                    >
-                      {formatCurrency(
-                        taxRegime === "old"
-                          ? getTaxResults().oldRegimeTax
-                          : getTaxResults().newRegimeTax,
-                      )}
-                    </motion.h2>
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-black/20 rounded-full border border-white/10">
-                      <Scale size={12} className="text-blue-200" />
-                      <span className="text-[9px] font-bold text-white uppercase tracking-widest">
-                        {taxRegime} Regime Applied
-                      </span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white/5 border border-white/10 rounded-3xl p-5 shadow-inner">
-                      <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">
-                        Gross Income
-                      </p>
-                      <p className="text-xl font-bold text-white tracking-tight">
-                        {formatCurrency(getTaxResults().totalIncome)}
-                      </p>
-                    </div>
-                    <div className="bg-white/5 border border-white/10 rounded-3xl p-5 shadow-inner">
-                      <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">
-                        Total Savings
-                      </p>
-                      <p className="text-xl font-bold text-emerald-400 tracking-tight">
-                        {formatCurrency(getTaxResults().totalDeductions)}
-                      </p>
-                    </div>
+                <div className="space-y-8 text-center">
+                  <div className="bg-gradient-to-br from-blue-600 to-indigo-800 p-8 rounded-[3rem] shadow-2xl">
+                    <p className="text-blue-100 text-[10px] uppercase font-black tracking-[0.3em] mb-3">Final Tax Due</p>
+                    <h2 className="text-5xl font-black text-white tracking-tighter mb-4">{formatCurrency(taxRegime === "old" ? getTaxResults().oldRegimeTax : getTaxResults().newRegimeTax)}</h2>
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-black/20 rounded-full border border-white/10"><span className="text-[9px] font-bold text-white uppercase">{taxRegime} Regime Applied</span></div>
                   </div>
                 </div>
               )}
 
-              {/* STEP 5: FILING DETAILS */}
               {currentStep === 5 && (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {Object.keys(filingDetails).map((key) => (
                       <div key={key} className="space-y-2 group">
-                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest ml-1 group-focus-within:text-blue-400">
-                          {key.replace(/([A-Z])/g, " $1")}{" "}
-                          <InfoTooltip field={key} />
-                        </div>
-                        <input
-                          type="text"
-                          value={filingDetails[key]}
-                          onChange={(e) =>
-                            handleInputChange("filing", key, e.target.value)
-                          }
-                          className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 px-6 text-white focus:border-blue-500 outline-none uppercase placeholder:lowercase transition-all"
-                          placeholder={`Enter ${key.replace(/([A-Z])/g, " $1")}`}
-                        />
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest ml-1 group-focus-within:text-blue-400">{key.replace(/([A-Z])/g, " $1")}</div>
+                        <input type="text" value={filingDetails[key]} onChange={(e) => handleInputChange("filing", key, e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 px-6 text-white focus:border-blue-500 outline-none uppercase" placeholder={`Enter ${key}`} />
                       </div>
                     ))}
                   </div>
-                  <div className="bg-blue-600/5 border border-blue-500/10 p-5 rounded-[2rem] flex gap-4 mt-6">
-                    <AlertCircle className="w-5 h-5 text-blue-500 shrink-0" />
-                    <p className="text-[10px] text-slate-400 leading-relaxed italic font-medium">
-                      I hereby certify that the information provided is true and
-                      accurate according to my bank statements and 26AS records.
-                    </p>
-                  </div>
                 </div>
               )}
+
             </motion.div>
           </AnimatePresence>
 
-          {/* Liquid Navigation */}
+          {/* Navigation */}
           <div className="flex gap-4 mt-12">
             {currentStep > 1 && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  setCurrentStep(currentStep - 1);
-                  saveProgress();
-                }}
-                className="flex-1 bg-white/5 border border-white/10 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center transition-colors hover:bg-white/10"
-              >
-                <ChevronLeft size={20} className="mr-2" /> Previous
-              </motion.button>
+              <button onClick={() => { setCurrentStep(currentStep - 1); saveProgress(); }} className="flex-1 bg-white/5 border border-white/10 text-white py-5 rounded-2xl font-black text-[11px] uppercase flex items-center justify-center hover:bg-white/10"><ChevronLeft size={20} className="mr-2" /> Back</button>
             )}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={async () => {
-                await saveProgress();
-                if (currentStep < 5) {
-                  setCurrentStep(currentStep + 1);
-                } else {
-                  alert("ITR Filed & Data Synced with Database!");
-                }
-              }}
-              className="flex-[2] bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-2xl shadow-blue-600/30 transition-all"
-            >
-              {currentStep === 4
-                ? "Review & File"
-                : currentStep === 5
-                  ? "Submit Return"
-                  : "Continue"}
-              <ChevronRight size={18} />
-            </motion.button>
+            <button onClick={async () => { await saveProgress(); if (currentStep < 5) setCurrentStep(currentStep + 1); else alert("ITR Submitted Successfully!"); }} className="flex-[2] bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black text-[11px] uppercase flex items-center justify-center gap-2 shadow-2xl transition-all">
+              {currentStep === 4 ? "Review & File" : currentStep === 5 ? "Submit Return" : "Continue"} <ChevronRight size={18} />
+            </button>
           </div>
         </div>
-        <p className="text-center text-[9px] text-slate-700 font-black uppercase tracking-[0.4em] py-4">
-          Ministry Approved Simulation • Secure Protocol
-        </p>
       </div>
     </div>
   );

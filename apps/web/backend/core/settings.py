@@ -1,12 +1,6 @@
-"""
-Django settings for core project.
-Optimized for Spendsy React + Django + Firebase Auth.
-"""
-
+# NEW CODE-----------------
 import os
-import firebase_admin
 from pathlib import Path
-from firebase_admin import credentials
 from dotenv import load_dotenv
 
 # 1. BASE DIRECTORY & ENV LOADING
@@ -14,34 +8,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # 2. CORE SECURITY SETTINGS
-# Added a fallback value for SECRET_KEY to prevent startup crashes
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key-for-local-dev')
 DEBUG = os.getenv('DEBUG') == 'True'
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
-# 3. FIREBASE INITIALIZATION
-firebase_dict = {
-    "type": os.getenv("FIREBASE_TYPE"),
-    "project_id": os.getenv("FIREBASE_PROJECT_ID"),
-    "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
-    "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace('\\n', '\n') if os.getenv("FIREBASE_PRIVATE_KEY") else None,
-    "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
-    "client_id": os.getenv("FIREBASE_CLIENT_ID"),
-    "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
-    "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
-    "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_CERT_URL"),
-    "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_CERT_URL"),
-}
-
-try:
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(firebase_dict)
-        firebase_admin.initialize_app(cred)
-        print("🚀 Firebase initialized successfully via Environment Variables")
-except Exception as e:
-    print(f"⚠️ Firebase initialization failed: {e}")
-
-# 4. APPLICATION DEFINITION
+# 3. APPLICATION DEFINITION
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -59,7 +30,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # Keep at the top
+    'corsheaders.middleware.CorsMiddleware', # MUST stay at the top
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -69,20 +40,22 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# 5. REST FRAMEWORK & CORS
+# 4. REST FRAMEWORK & CORS (Reset for public testing)
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'core.auth_backend.FirebaseAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny', # Allows connection without tokens
     ],
     'COERCE_DECIMAL_TO_STRING': False, 
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
-# 6. DATABASE & PATHS
+# 5. DATABASE & PATHS
 ROOT_URLCONF = 'core.urls'
 WSGI_APPLICATION = 'core.wsgi.application'
 
@@ -93,7 +66,7 @@ DATABASES = {
     }
 }
 
-# 7. TEMPLATES, AUTH, & I18N
+# 6. TEMPLATES, AUTH, & I18N
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -127,5 +100,3 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Extra API Keys
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-
-CORS_ALLOW_CREDENTIALS = True

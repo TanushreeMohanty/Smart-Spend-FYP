@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import UserProfile, Transaction, WealthItem, TaxProfile,ITRProfile
+from .models import UserProfile, Transaction, WealthItem, TaxProfile,ITRData
+import json
+from django.utils.safestring import mark_safe
 # --- 1. INLINES ---
 # These allow you to edit profile/tax data directly on the User page
 class TaxProfileInline(admin.StackedInline): # Corrected inheritance
@@ -80,22 +82,60 @@ class TaxProfileAdmin(admin.ModelAdmin):
         }),
     )
     
-@admin.register(ITRProfile)
-class ITRProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'tax_regime', 'updated_at', 'pan_number')
-    search_fields = ('user__username', 'pan_number')
+@admin.register(ITRData)
+class ITRDataAdmin(admin.ModelAdmin):
+    # 1. Main List View: Added Regime and Total Deductions for quick overview
+    list_display = ('user', 'get_pan', 'get_salary', 'get_total_deductions', 'tax_regime', 'updated_at')
     
+    # 2. Search and Filters: Search by PAN, Email, or Username
+    search_fields = ('user__username', 'filing_details__panNumber', 'filing_details__email')
+    list_filter = ('tax_regime', 'updated_at')
+
+    # --- HELPER METHODS FOR LIST DISPLAY ---
+    
+    def get_salary(self, obj):
+        val = obj.income_data.get('salary', 0)
+        return f"₹{val}" if val else "₹0"
+    get_salary.short_description = 'Salary'
+
+    def get_pan(self, obj):
+        return obj.filing_details.get('panNumber', 'N/A').upper()
+    get_pan.short_description = 'PAN'
+
+    def get_total_deductions(self, obj):
+        # Sums up the common deduction fields for the admin list view
+        d = obj.deductions_data or {}
+        total = sum([float(v) for v in d.values() if str(v).replace('.','',1).isdigit()])
+        return f"₹{total:,.0f}"
+    get_total_deductions.short_description = 'Total Deductions'
+
+    # --- ORGANIZED EDIT PAGE ---
     fieldsets = (
-        ('Header Information', {
-            'fields': ('user', 'tax_regime')
+        ('Account & Strategy', {
+            'fields': ('user', 'tax_regime'),
+            'description': 'User account linked to this tax profile and their chosen regime.'
         }),
-        ('Income Breakdown', {
-            'fields': (('salary', 'business_income'), ('house_property', 'capital_gains'), ('other_income', 'interest_income'))
+        ('Financial Data (JSON)', {
+            'fields': ('income_data', 'deductions_data'),
+            'classes': ('collapse',), # Makes this section collapsible
+            'description': 'Detailed breakdown of income sources and 80C/80D deductions.'
         }),
-        ('Tax Deductions', {
-            'fields': (('section_80c', 'section_80d'), ('section_80e', 'section_80g'), ('hra_deduction', 'home_loan_interest', 'nps_80ccd'))
+        ('Official Filing Details', {
+            'fields': ('filing_details',),
+            'description': 'PAN, Aadhar, and Bank contact information.'
         }),
-        ('Identity & Bank Details', {
-            'fields': (('pan_number', 'aadhar_number'), ('bank_account', 'ifsc_code'), ('email', 'mobile'))
+        ('System Metadata', {
+            'fields': ('updated_at',),
         }),
     )
+    
+    readonly_fields = ('updated_at',)
+
+    # Custom styling for the JSON fields in admin (Optional but helpful)
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        # You can add custom placeholder/help text here if needed
+        return form
+
+# Optional: If you want to use a fancy JSON editor, 
+# you can install 'django-json-widget' and register it here.
