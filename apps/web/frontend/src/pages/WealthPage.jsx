@@ -45,32 +45,35 @@ const WealthPage = ({
     { month: "Jan", value: netWorth },
   ];
 
-// --- 3. Handlers ---
-const executeAddWealth = async (data) => {
-  try {
-    const response = await fetch(`http://127.0.0.1:8000/api/finance/get-wealth/${user.id}/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: data.title, // Correctly mapped
-        amount: parseFloat(data.amount) * parseFloat(data.unit),
-        type: data.type,
-        category: "General",
-      }),
-    });
+  // --- 3. Handlers ---
+  const executeAddWealth = async (data) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/finance/get-wealth/${user.id}/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: data.title, // Correctly mapped
+            amount: parseFloat(data.amount) * parseFloat(data.unit),
+            type: data.type,
+            category: "General",
+          }),
+        },
+      );
 
-    if (response.ok) {
-      setWealthName("");
-      setWealthAmount("");
-      showToast("Item added successfully!", "success");
-      onSuccess(); // <--- CRITICAL: Refetches data from Django
-    } else {
-      showToast("Failed to add item", "error");
+      if (response.ok) {
+        setWealthName("");
+        setWealthAmount("");
+        showToast("Item added successfully!", "success");
+        onSuccess(); // <--- CRITICAL: Refetches data from Django
+      } else {
+        showToast("Failed to add item", "error");
+      }
+    } catch (error) {
+      showToast("Server error", "error");
     }
-  } catch (error) {
-    showToast("Server error", "error");
-  }
-};
+  };
 
   const requestAddWealth = (e) => {
     e.preventDefault();
@@ -84,28 +87,60 @@ const executeAddWealth = async (data) => {
       unit: wealthUnit,
     };
 
-    triggerConfirm("Confirm adding this asset/liability?", () => executeAddWealth(newItem));
+    triggerConfirm("Confirm adding this asset/liability?", () =>
+      executeAddWealth(newItem),
+    );
   };
 
-const executeDeleteWealth = async (id) => {
-  try {
-    // Correct URL format matching your Django urls.py
-    const response = await fetch(`http://127.0.0.1:8000/api/finance/delete-wealth/${id}/`, {
-      method: "DELETE",
-    });
+  const executeDeleteWealth = async (id) => {
+    try {
+      // Correct URL format matching your Django urls.py
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/finance/delete-wealth/${id}/`,
+        {
+          method: "DELETE",
+        },
+      );
 
-    if (response.ok) {
-      showToast("Item removed", "success");
-      onSuccess(); // <--- CRITICAL: Refetches data from Django
+      if (response.ok) {
+        showToast("Item removed", "success");
+        onSuccess(); // <--- CRITICAL: Refetches data from Django
+      }
+    } catch (e) {
+      showToast("Failed to remove", "error");
     }
-  } catch (e) {
-    showToast("Failed to remove", "error");
-  }
-};
+  };
 
   const requestDeleteWealth = (id) =>
     triggerConfirm("Remove this item?", () => executeDeleteWealth(id));
 
+  // --- 3. Handlers ---
+
+  // ADD THIS NEW HANDLER HERE
+  const executeUpdateWealth = async (id, updatedData) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/finance/update-wealth/${id}/`,
+        {
+          method: "PUT", // or "PATCH"
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: updatedData.title,
+            amount: updatedData.amount,
+          }),
+        },
+      );
+
+      if (response.ok) {
+        showToast("Item updated", "success");
+        onSuccess(); // Refetch data to refresh the UI
+      } else {
+        showToast("Failed to update", "error");
+      }
+    } catch (error) {
+      showToast("Server connection error", "error");
+    }
+  };
   return (
     <div className="space-y-6 pb-28 animate-in slide-in-from-bottom-8">
       {/* NEW: Net Worth Graph Card */}
@@ -247,6 +282,7 @@ const executeDeleteWealth = async (id) => {
                 key={item.id}
                 item={item}
                 onDelete={() => requestDeleteWealth(item.id)}
+                onUpdate={executeUpdateWealth} // <--- ADD THIS LINE
               />
             ))}
           </div>

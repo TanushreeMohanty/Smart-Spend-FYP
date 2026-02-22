@@ -2,10 +2,10 @@
 # --------------------------------
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework import viewsets, status
+from rest_framework import status
 from django.db.models import Q
 
 from .models import Transaction, WealthItem, UserProfile, TaxProfile, ITRData
@@ -43,7 +43,7 @@ def login_user(request):
             "message": "Login successful", 
             "user_id": user.id, 
             "username": user.username,
-            "email": user.email
+            "email": user.email 
         }, status=status.HTTP_200_OK)
     return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -52,43 +52,32 @@ def login_user(request):
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def profile_settings(request, user_id):
-    """
-    Handles both Welcome Wizard and Profile Page updates.
-    Uses camelCase to match React state keys.
-    """
     try:
         user = User.objects.get(id=user_id)
         profile, created = UserProfile.objects.get_or_create(user=user)
 
         if request.method == 'POST':
-            # Mapping frontend camelCase to backend model fields
             profile.monthlyIncome = request.data.get('monthlyIncome', profile.monthlyIncome)
             profile.monthlyBudget = request.data.get('monthlyBudget', profile.monthlyBudget)
             profile.dailyBudget = request.data.get('dailyBudget', profile.dailyBudget)
             profile.is_business = request.data.get('is_business', profile.is_business)
             profile.save()
             
-            return Response({
-                "message": "Settings updated!",
-                "settings": {
-                    "monthlyIncome": float(profile.monthlyIncome),
-                    "monthlyBudget": float(profile.monthlyBudget),
-                    "dailyBudget": float(profile.dailyBudget),
-                    "is_business": profile.is_business
-                }
-            }, status=status.HTTP_200_OK)
+            # If email is sent in settings, update the User model too
+            if 'email' in request.data:
+                user.email = request.data.get('email')
+                user.save()
 
         return Response({
+            "username": user.username,
+            "email": user.email, # FIXED: Added email to profile response
             "monthlyIncome": float(profile.monthlyIncome),
             "monthlyBudget": float(profile.monthlyBudget),
             "dailyBudget": float(profile.dailyBudget),
             "is_business": profile.is_business
         })
-
     except User.DoesNotExist:
-        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "User not found"}, status=404)
 
 # --- TRANSACTION ENDPOINTS ---
 
@@ -246,29 +235,36 @@ def delete_wealth_item(request, item_id):
     except WealthItem.DoesNotExist:
         return Response({"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 
-@csrf_exempt # Add this decorator
+@csrf_exempt
 @api_view(['PUT', 'PATCH'])
+@permission_classes([AllowAny])
 def update_wealth_item(request, item_id):
+    """
+    Handles the tick button save action.
+    Expects JSON: { "title": "car", "amount": 1500000 }
+    """
     try:
         item = WealthItem.objects.get(id=item_id)
         data = request.data
 
-        # Update fields if they exist in the request
-        item.title = data.get('title', item.title)
-        item.amount = data.get('amount', item.amount)
-        item.type = data.get('type', item.type)
-        item.category = data.get('category', item.category)
+        # Support both 'title' and 'name' keys to be safe
+        item.title = data.get('title', data.get('name', item.title))
         
+        # Ensure amount is treated as a number
+        if 'amount' in data:
+            item.amount = float(data.get('amount'))
+            
         item.save()
         
         return Response({
-            "message": "Updated successfully",
+            "status": "success",
+            "message": "Item updated",
             "item": {
                 "id": item.id,
                 "title": item.title,
                 "amount": float(item.amount)
             }
-        })
+        }, status=status.HTTP_200_OK)
     except WealthItem.DoesNotExist:
         return Response({"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
@@ -303,50 +299,27 @@ def manage_tax_profile(request, user_id):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-
-@csrf_exempt # Add this decorator
-@api_view(['POST'])
-@permission_classes([AllowAny]) # Ensures the frontend can access without JWT tokens for now
-def save_tax_profile(request):
-    # Assuming the user is authenticated
-    user = request.user 
-    
-    # This finds the existing profile or prepares to create a new one
-    profile, created = TaxProfile.objects.get_or_create(user=user)
-    
-    serializer = TaxProfileSerializer(profile, data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=201)
-    return Response(serializer.errors, status=400)
-
 @csrf_exempt
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def itr_data_handler(request, user_id):
-    # This ensures a record exists, preventing the 404
     obj, created = ITRData.objects.get_or_create(user_id=user_id)
 
     if request.method == 'POST':
-        # 1. Update with incoming data (keep existing if field is missing)
-        obj.income_data = request.data.get('income_data', obj.income_data)
-        obj.deductions_data = request.data.get('deductions_data', obj.deductions_data)
-        obj.filing_details = request.data.get('filing_details', obj.filing_details)
-        obj.tax_regime = request.data.get('tax_regime', obj.tax_regime)
+        # Update JSON fields directly from React state
+        for field in ['income_data', 'deductions_data', 'filing_details']:
+            if field in request.data:
+                setattr(obj, field, request.data.get(field))
         
+        obj.tax_regime = request.data.get('tax_regime', obj.tax_regime)
         obj.save()
-        return Response({
-            "status": "success", 
-            "message": "ITR Profile synchronized successfully"
-        })
+        return Response({"status": "success"})
 
-    # GET: Return the full profile
     return Response({
         "income_data": obj.income_data,
         "deductions_data": obj.deductions_data,
         "filing_details": obj.filing_details,
-        "tax_regime": obj.tax_regime,
-        "updated_at": obj.updated_at
+        "tax_regime": obj.tax_regime
     })
 # Health Check Endpoint
 
